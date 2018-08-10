@@ -48,11 +48,14 @@ class Query:
         ]
 
     def repo_num_of_commits(self, repouri):
+        return len(list(self.repo_iterate_commits(repouri, False)))
+
+        # TODO: exract commit using HTMLParser - is much faster
         res = self._g.repos[repouri].get()
         assert res[0] == 200
         repo = Models.Repo.create(res[1])
-        requests.get(repo.html_url)
-        # TODO: exract commit using HTMLParser 
+        requests.get(repo.html_url) # get full html page
+        # TODO: continue...
 
 
     def repo_iterate_commits(self, repouri, fetch_real_commit=True):
