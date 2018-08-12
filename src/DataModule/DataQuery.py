@@ -2,6 +2,7 @@ import itertools
 
 from agithub.GitHub import GitHub
 import uritemplate, requests
+from bs4 import BeautifulSoup
 
 import DataModule.models as Models
 
@@ -48,14 +49,17 @@ class Query:
         ]
 
     def repo_num_of_commits(self, repouri):
-        return len(list(self.repo_iterate_commits(repouri, False)))
-
-        # TODO: exract commit using HTMLParser - is much faster
+        # 1. get the repo api:
         res = self._g.repos[repouri].get()
         assert res[0] == 200
         repo = Models.Repo.create(res[1])
-        requests.get(repo.html_url) # get full html page
-        # TODO: continue...
+        # 2. fetch full html page
+        req = requests.get(repo.html_url)
+        assert req.status_code == 200
+        # 3. parse the page and return commits num:
+        soup = BeautifulSoup(req.content, 'html.parser')
+        commits = soup.find('li', 'commits').find('span', 'num').get_text().strip()
+        return int(commits)
 
 
     def repo_iterate_commits(self, repouri, fetch_real_commit=True):
