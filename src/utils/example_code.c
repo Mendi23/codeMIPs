@@ -1,5 +1,10 @@
 
 
+typedef int* uri;
+struct mendi{
+    int a;
+};
+
 int func2(){
     return 1;
 }
