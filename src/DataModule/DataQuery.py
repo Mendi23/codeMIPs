@@ -30,17 +30,43 @@ KNOWN_BIG_REPOS = [
     "/Microsoft/ELL",
 ]
 
+
 class Query:
+    """
+    This is your dragon handle to the mighty github!!!!
+    Oh poor user, you are about to see the full power of github on your tiny
+    programmer's hands.
+    """
 
     def __init__(self):
         self._g = GitHub()
 
+    def _get_last_page(self, partial_req):
+        has_next = lambda headers: any(
+            h for h in headers if "Link" in h and "next" in h[1])
+
+        for pageNum in itertools.count(1):
+            res = partial_req.get(page=pageNum)
+            headers = self._g.getheaders()
+            assert res[0] == 200
+            if not has_next(headers):
+                return pageNum
+
+
     def get_user(self, useruri):
+        """
+        :param useruri: user *login* name. example: "mozilla"
+        :return: User object (see models.py)
+        """
         res = self._g.users[useruri].get()
         assert res[0] == 200
         return Models.User.create(res[1])
 
     def user_repos(self, useruri):
+        """
+        :param useruri: user *login* name. example: "mozilla"
+        :return: list of Repo objects (see models.py)
+        """
         repos = self._g.users[useruri].repos.get()
         assert repos[0] == 200
         return [
@@ -49,38 +75,48 @@ class Query:
         ]
 
     def repo_num_of_commits(self, repouri):
+        """
+        :param useruri: repo uri name.
+                        example: "mozilla/DeepSpeech" or KNOWN_SMALL_REPOS[6]
+        :return: number
+        """
+
         # 1. get the repo api:
         res = self._g.repos[repouri].get()
         assert res[0] == 200
         repo = Models.Repo.create(res[1])
+
         # 2. fetch full html page
         req = requests.get(repo.html_url)
         assert req.status_code == 200
+
         # 3. parse the page and return commits num:
         soup = BeautifulSoup(req.content, 'html.parser')
         commits = soup.find('li', 'commits').find('span', 'num').get_text().strip()
         return int(commits)
 
+    def repo_iterate_commits(self, repouri, fetch_files_for_commit=True):
+        """
+        Yo! welcome! this is very important function!
+        
+        :param repouri: repo uri name.
+                        example: "mozilla/DeepSpeech" or KNOWN_SMALL_REPOS[6]
+        :param fetch_files_for_commit: fetch also the files of the commit
+        :return: Commit
+        """
+        lastPage = self._get_last_page(self._g.repos[repouri].commits)
 
-    def repo_iterate_commits(self, repouri, fetch_real_commit=True):
-        has_next = lambda headers: len([h for h in headers if "Link" in h and "next" in h[1]]) > 0
-
-        for pageNum in itertools.count(1):
+        for pageNum in range(lastPage, 0, -1):
             res = self._g.repos[repouri].commits.get(page=pageNum)
-            headers = self._g.getheaders()
             assert res[0] == 200
 
-            for commit in (Models.CommitPartial.create(c) for c in res[1]):
-                if fetch_real_commit:
+            for commit in reversed([Models.CommitPartial.create(c) for c in res[1]]):
+                if fetch_files_for_commit:
                     real_commit = self._g.repos[repouri].commits[commit.sha].get()
                     assert real_commit[0] == 200
                     yield Models.Commit.create(real_commit[1])
                 else:
                     yield commit
-
-            if not has_next(headers):
-                break
-
 
     def search_repo(self, text, language):
         pass

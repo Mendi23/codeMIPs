@@ -1,4 +1,3 @@
-
 class Base:
     def __init__(self):
         self._name = "Base"
@@ -10,7 +9,7 @@ class Base:
     def __repr__(self):
         return f"{self.__class__}: {self.__dict__.__repr__()}"
 
-    def hooks(self):
+    def _hooks(self, json):
         pass
 
     @classmethod
@@ -23,7 +22,7 @@ class Base:
                 if key in c.__dict__.keys()
             }
         )
-        c.hooks()
+        c._hooks(json)
         return c
 
 
@@ -47,36 +46,63 @@ class User(Base):
         self.followers = None
         self.following = None
 
-
 class CommitPartial(Base):
+    """
+    CommitPartial is an object which returned from queries like:
+     https://api.github.com/repos/urielha/log4stash/commits
+
+    > Doesn't contain `files` <
+
+    {
+        commit: {
+            comitter: {name, email, date},
+            tree (Base), message,
+        },
+        comitter: { login, type },
+    }
+    """
+
     def __init__(self):
         super().__init__()
-        self.commit = None
         self.committer = None
+        self.message = None
+        self.date = None
+        self.tree = None
 
-    def hooks(self):
-        if self.committer is not None:
-            self.committer = User.create(self.committer)
-        if self.commit is not None:
-            self.commit = CommitPartial.create(self.commit)
+    def _hooks(self, json):
+        self.committer = User.create(json["committer"])
+
+        assert json["commit"] is not None
+        commit = json["commit"]
+        self.tree = Base.create(commit["tree"])
+        self.message = commit["message"]
+        self.date = commit["committer"]["date"]
+
+
 
 class Commit(CommitPartial):
+    """
+    Commit is a CommitPartial but with `files`
+    """
     def __init__(self):
         super().__init__()
         self.files = None
 
-    def hooks(self):
-        if self.files is not None and len(self.files) > 0:
-            self.files = [File.create(f) for f in self.files]
+    def _hooks(self, json):
+        super()._hooks(json)
+        self.files = [FileChangeset.create(f) for f in json["files"]]
 
-class File(Base):
+
+class FileChangeset(Base):
     def __init__(self):
         super().__init__()
         self.filename = None
-        self.status = None
+        self.status = None # renamed / modified / added / deleted
         self.additions = None
         self.deletions = None
         self.changes = None
         self.patch = None
         self.contents_url = None
         self.raw_url = None
+        self.previous_filename = None
+

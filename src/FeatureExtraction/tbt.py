@@ -3,7 +3,7 @@ from _ast import AST
 
 from pycparser import parse_file
 
-from src.utils.file_paths import EXAMPLE_PATH
+from utils.file_paths import EXAMPLE_PATH
 
 def parse_util() -> AST:
     return parse_file(EXAMPLE_PATH, use_cpp=True,
