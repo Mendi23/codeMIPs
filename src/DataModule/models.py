@@ -1,4 +1,4 @@
-from DataModule.DataManipulation import create_segments_from_file
+from DataModule.DataManipulation import create_changes_from_file
 
 
 class Base:
@@ -95,9 +95,9 @@ class Commit(CommitPartial):
         super()._hooks(json)
         self.files = [FileChangeset.create(f) for f in json["files"]]
 
-    def iterate_segments(self):
+    def iterate_changes(self):
         for file in self.files:
-            yield from create_segments_from_file(file)
+            yield from create_changes_from_file(file)
 
 class FileChangeset(Base):
     def __init__(self):
@@ -113,9 +113,7 @@ class FileChangeset(Base):
         self.previous_filename = None
 
 
-class Segment:
+class Change:
     def __init__(self):
-        self.name = None
+        self.segment = None
         self.type = None
-        self.action = None
-        self.diff_list = None

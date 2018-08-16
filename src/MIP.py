@@ -2,6 +2,9 @@
 Created on Jun 7, 2015
 
 @author: Ofra
+
+Edited: Aug-Sep, 2018
+@editors: Uriel, Mendi
 '''
 import networkx as nx
 import math
@@ -97,6 +100,15 @@ class Mip:
 
     '''
     MIP-update procedure, runs after each user session, updates weights between edges
+    
+    session:
+    @user - name of user
+    @actions - list of:
+        action:
+        @ao - id of the object the action was preformed on
+        @actType - 'delete', 
+        @updateMipNodeID - method which recieves the id of the object in the graph
+        @weightInc - weight of the action (to be added to the edge)
     '''
 
     def updateMIP(self, session):
@@ -119,8 +131,6 @@ class Mip:
             ao_node = self.objects[ao]
             if self.iteration not in self.mip.node[ao_node]['revisions']:
                 self.mip.node[ao_node]['revisions'].append(self.iteration)  # add revision
-            # else:
-            #     print 'interesting' DEBUG
             self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)
             changedAOs.append(ao_node)
 
@@ -131,7 +141,7 @@ class Mip:
             ao_node1 = self.objects[session.actions[i].ao]
             for j in range(i + 1, len(session.actions)):
                 ao_node2 = self.objects[session.actions[j].ao]
-                if (ao_node1 != ao_node2):
+                if ao_node1 != ao_node2:
                     self.updateEdge(ao_node1, ao_node2, 'ao-ao', self.objectsInc)
 
         # update weights between objects that user was informed about and objects that changed : this is relevant only if agent does not choose which nodes to change apriori
@@ -151,7 +161,6 @@ class Mip:
                     elif edge[2]['edge_type'] == 'u-ao':
                         if ((edge[0] == user_node) | (edge[1] == user_node)):
                             edge[2]['weight'] = max(edge[2]['weight'] - self.decay, 0)
-        self.currentSession = session
         #        print'updating'
 
         #        self.centrality = nx.degree_centrality(self.mip) #TODO: apriori importance for now is simply degree, consider reverting to more complex option
@@ -331,7 +340,7 @@ class Mip:
         prob = 1.0
         for i in range(len(path) - 1):
             prob = prob * (
-                        float(self.mip[path[i]][path[i + 1]]['weight']) / self.mip.degree(path[i]))
+                    float(self.mip[path[i]][path[i + 1]]['weight']) / self.mip.degree(path[i]))
         #        print 'prob' + str(prob)
         return prob
 
@@ -350,7 +359,7 @@ class Mip:
         revs = self.mip.node[aoNode]['revisions']
         i = 0
         while revs[i] < fromRevision:
-            i = i + 1
+            i += 1
             if i >= len(revs) - 1:
                 break
 

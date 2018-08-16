@@ -1,11 +1,22 @@
 from DataModule.DataQuery import Query
+from Entities import Session, Action
+from MIP import Mip
 
 
 def main(repo_path):
-    g = Query()
-    for commit in g.repo_iterate_commits(repo_path):
-        for file in commit.iterate_files():
-            for
+    git = Query()
+    graph = Mip()
+    for commit in git.repo_iterate_commits(repo_path):
+        actions = []
+        for modif in commit.iterate_changes():
+            if modif.type == 'rename':
+                pass
+
+
+            # here should calculate acion incWeight
+            actions.append(Action(modif.segment, modif.type))
+        graph.updateMIP(Session(commit.committer, actions,commit.date))
+
 
 
 
