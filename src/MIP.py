@@ -156,10 +156,10 @@ class Mip:
             for edge in self.mip.edges_iter(data=True):
                 if edge[2]['updated'] == 0:
                     if edge[2]['edge_type'] == 'ao-ao':
-                        if ((edge[0] in changedAOs) | (edge[1] in changedAOs)):
+                        if edge[0] in changedAOs or edge[1] in changedAOs:
                             edge[2]['weight'] = max(edge[2]['weight'] - self.decay, 0)
                     elif edge[2]['edge_type'] == 'u-ao':
-                        if ((edge[0] == user_node) | (edge[1] == user_node)):
+                        if edge[0] == user_node or edge[1] == user_node:
                             edge[2]['weight'] = max(edge[2]['weight'] - self.decay, 0)
         #        print'updating'
 
@@ -196,9 +196,9 @@ class Mip:
             self.nodeIDsToObjectsIds[self.lastID] = object_id
         return self.objects[object_id]
 
-    def updateEdge(self, i1, i2, edge_type, increment=1):
+    def updateEdge(self, i1, i2, edge_type, increment=1.0):
         if self.mip.has_edge(i1, i2):
-            self.mip[i1][i2]['weight'] = self.mip[i1][i2]['weight'] + increment
+            self.mip[i1][i2]['weight'] += increment
             self.mip[i1][i2][
                 'lastKnown'] = self.iteration  # update last time user knew about object
         #            print str(self.mip[i1][i2]['lastKnown'])

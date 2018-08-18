@@ -14,9 +14,9 @@ class Session:
         self.time = time #revision number
 
     def __str__(self):
-        toPrint = f"session at time {str(self.time)} user = {str(self.user)}\n"
+        toPrint = f"session at time {self.time} user = {self.user}\n"
         for act in self.actions:
-            toPrint = toPrint+str(act)+"\n"
+            toPrint = toPrint+act+"\n"
         return toPrint
         
 class Action:
