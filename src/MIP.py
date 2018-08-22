@@ -11,14 +11,20 @@ import math
 
 
 class Mip:
-    def __init__(self, alpha=0.2, beta1=0.6, beta2=0, gamma=0.2, similarityMetric="edge",
-                 decay=0.1):
+    """
+    @:param alpha, beta1, beta2, gamma
+    @:param decay
+    """
+
+    def __init__(self, alpha=0.2, beta1=0.6, beta2=0, gamma=0.2, similarityMetric="edge", decay=0.1):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
         self.iteration = 0
         self.lastID = -1
+        # TODO: change decay default and definition. calclating time, changes by the same users, sessions by the same user, changes by other users.
         self.decay = decay  # determines how much to decay weights when there is not interaction between two nodes over time
+        # TODO: dynamic objectsInc?
         self.objectsInc = 1.0  # weight increment
         self.centrality = None  # centrality values of all nodes
         self.log = []  # log holds all the session data
@@ -303,13 +309,10 @@ class Mip:
         return proximity
 
     def simpleProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
-        proximity = 0.0
         sharedWeight = 0.0
         for node in nx.common_neighbors(self.mip, s, t):
-            sharedWeight = sharedWeight + self.mip[s][node]['weight'] + self.mip[t][node][
-                'weight']  # the weight of the path connecting s and t through the current node
-        proximity = sharedWeight / (self.mip.degree(s, weight='weight') + self.mip.degree(t,
-            weight='weight') + 0.000000000001)
+            sharedWeight = sharedWeight + self.mip[s][node]['weight'] + self.mip[t][node]['weight']  # the weight of the path connecting s and t through the current node
+        proximity = sharedWeight / (self.mip.degree(s, weight='weight') + self.mip.degree(t, weight='weight') + 0.000000000001)
         return proximity
 
     def edgeBasedProximity(self, s, t, edgeWeight=0.7):
@@ -390,17 +393,15 @@ class Mip:
                 notificationsList.append(toAdd)
             else:
                 j = 0
-                while ((doi < notificationsList[j][1])):
-                    if j < len(notificationsList) - 1:
-                        j = j + 1
-                    else:
-                        j = j + 1
+                while doi < notificationsList[j][1]:
+                    j += 1
+                    if j >= len(notificationsList) - 1:
                         break
                 toAdd = []
                 toAdd.append(self.nodeIDsToObjectsIds[
                     ao])  # need to get the true object id to return (external to mip)
                 toAdd.append(doi)
-                if (j < len(notificationsList)):
+                if j < len(notificationsList):
                     notificationsList.insert(j, toAdd)
                 else:
                     notificationsList.append(toAdd)
@@ -433,25 +434,22 @@ class Mip:
                         inNotificationList = True
                     # put in appropriate place in list based on doi
                     if len(notificationsList) == 0:
-                        toAdd = list
+                        toAdd = []
                         toAdd.append(act.ao)
                         toAdd.append(doi)
                         notificationsList.append(toAdd)
-                    elif not inNotificationList:  # only add to list if wasn't already there (doi does
-                        #  not change)
+                    elif not inNotificationList:  # only add to list if wasn't already there (doi does not change)
                         j = 0
 
                         while doi < notificationsList[j][1]:
-                            if j < len(notificationsList) - 1:
-                                j = j + 1
-                            else:
-                                j = j + 1
+                            j += 1
+                            if j >= len(notificationsList) - 1:
                                 break
                         toAdd = []
                         toAdd.append(act.ao)
                         toAdd.append(doi)
 
-                        if (j < len(notificationsList)):
+                        if j < len(notificationsList):
                             notificationsList.insert(j, toAdd)
                         else:
                             notificationsList.append(toAdd)
@@ -462,37 +460,30 @@ class Mip:
         notificationsList = []  # will hold list of objects, eventually sorted by interest
         for ao in aoList:
             changeExtentSinceLastKnown = self.changeExtent(user, ao)
-            if ((changeExtentSinceLastKnown != 0) | (
-                    onlyChanged == False)):  # consider object only if it has changed at least once since agent last known about it
+            if changeExtentSinceLastKnown != 0 or not onlyChanged:  # consider object only if it has changed at least once since agent last known about it
                 doi = self.DegreeOfInterestMIPs(user, ao)
 
                 if len(notificationsList) == 0:
                     toAdd = []
-                    toAdd.append(self.nodeIDsToObjectsIds[
-                        ao])  # need to get the true object id to return (external to mip)
+                    toAdd.append(self.nodeIDsToObjectsIds[ao])  # need to get the true object id to return (external to mip)
                     toAdd.append(doi)
                     notificationsList.append(toAdd)
                 else:
                     j = 0
-                    while ((doi < notificationsList[j][1])):
-                        if j < len(notificationsList) - 1:
-                            j = j + 1
-                        else:
-                            j = j + 1
+                    while doi < notificationsList[j][1]:
+                        j += 1
+                        if j >= len(notificationsList) - 1:
                             break
                     toAdd = []
-                    toAdd.append(self.nodeIDsToObjectsIds[
-                        ao])  # need to get the true object id to return (external to mip)
+                    toAdd.append(self.nodeIDsToObjectsIds[ao])  # need to get the true object id to return (external to mip)
                     toAdd.append(doi)
-                    if (j < len(notificationsList)):
+                    if j < len(notificationsList):
                         notificationsList.insert(j, toAdd)
                     else:
                         notificationsList.append(toAdd)
-                    #        print 'notification list size = '+str(len(notificationsList))
         return notificationsList
 
-    def rankAllGivenUserFocus(self, user, focus_obj, time,
-                              onlyChanged=True):  # TODO: check correctness and try at some point
+    def rankAllGivenUserFocus(self, user, focus_obj, time, onlyChanged=True):  # TODO: check correctness and try at some point
         aoList = self.getLiveAos()  # gets the MIP NODES that represent live objects
         notificationsList = []  # will hold list of objects, eventually sorted by interest
         if focus_obj in self.objects.keys():
@@ -513,17 +504,15 @@ class Mip:
                             notificationsList.append(toAdd)
                         else:
                             j = 0
-                            while ((doi < notificationsList[j][1])):
-                                if j < len(notificationsList) - 1:
-                                    j = j + 1
-                                else:
-                                    j = j + 1
+                            while doi < notificationsList[j][1]:
+                                j += 1
+                                if j >= len(notificationsList) - 1:
                                     break
                             toAdd = []
                             toAdd.append(self.nodeIDsToObjectsIds[
                                 ao])  # need to get the true object id to return (external to mip)
                             toAdd.append(doi)
-                            if (j < len(notificationsList)):
+                            if j < len(notificationsList):
                                 notificationsList.insert(j, toAdd)
                             else:
                                 notificationsList.append(toAdd)
@@ -542,20 +531,17 @@ class Mip:
             focus_ao = self.objects[focus_obj]
 
             checkedObjects = {}
-            for i in range(time, len(
-                    self.log)):  # this includes revision at time TIME and does  include last revision in MIP as we are querying before we update
+            for i in range(time, len(self.log)):  # this includes revision at time TIME and does  include last revision in MIP as we are querying before we update
                 #            print "time = "+str(i) + "author = "+self.log[i].user
 
                 session = self.log[i]
                 for act in session.actions:
-                    if ((act.actType != 'smallEdit') | (onlySig == False)):
+                    if act.actType != 'smallEdit' or not onlySig:
                         inNotificationList = False
-                        if (
-                                act.ao not in checkedObjects):  # currently not giving more weight to the fact that an object was changed multiple times. --> removed because if there are both big and small changes etc...
+                        if act.ao not in checkedObjects:  # currently not giving more weight to the fact that an object was changed multiple times. --> removed because if there are both big and small changes etc...
                             # TODO: possibly add check whether the action is notifiable
 
-                            doi = self.DegreeOfInterestMIPsFocus(user, self.objects[act.ao],
-                                focus_ao)
+                            doi = self.DegreeOfInterestMIPsFocus(user, self.objects[act.ao], focus_ao)
                             checkedObjects[act.ao] = doi
                         else:
                             doi = checkedObjects[act.ao]  # already computed doi, don't recompute!
@@ -566,20 +552,18 @@ class Mip:
                             toAdd.append(act.ao)
                             toAdd.append(doi)
                             notificationsList.append(toAdd)
-                        elif inNotificationList == False:  # only add to list if wasn't already there (doi does not change)
+                        elif not inNotificationList:  # only add to list if wasn't already there (doi does not change)
                             j = 0
 
-                            while ((doi < notificationsList[j][1])):
-                                if j < len(notificationsList) - 1:
-                                    j = j + 1
-                                else:
-                                    j = j + 1
+                            while doi < notificationsList[j][1]:
+                                j += 1
+                                if j >= len(notificationsList) - 1:
                                     break
                             toAdd = []
                             toAdd.append(act.ao)
                             toAdd.append(doi)
 
-                            if (j < len(notificationsList)):
+                            if j < len(notificationsList):
                                 notificationsList.insert(j, toAdd)
                             else:
                                 notificationsList.append(toAdd)
@@ -594,20 +578,16 @@ class Mip:
     '''
 
     def __str__(self):
-        return "MIP_" + str(self.alpha) + "_" + str(self.beta1) + "_" + str(self.beta2) + "_" + str(
-            self.gamma) + "_" + str(self.decay) + "_" + self.similarityMetric
+        return f"MIP_{self.alpha}_{self.beta1}_{self.beta2}_{self.gamma}_{self.decay}_{self.similarityMetric}"
 
     def createNodeLabels(self, nodeTypes='both'):
         labels = {}
         for node, data in self.mip.nodes(data=True):
             if data['node_type'] == 'user':
-                if ((nodeTypes == 'user') | (nodeTypes == 'both')):
-                    label = 'u' + str(self.nodeIDsToUsersIds[node])
-                    labels[node] = label
-            else:
-                if ((nodeTypes == 'object') | (nodeTypes == 'both')):
-                    label = 'o' + str(self.nodeIDsToObjectsIds[node])
-                    labels[node] = label
+                if nodeTypes == 'user' or nodeTypes == 'both':
+                    labels[node] = 'u' + self.nodeIDsToUsersIds[node]
+            elif nodeTypes == 'object' or nodeTypes == 'both':
+                labels[node] = 'o' + self.nodeIDsToObjectsIds[node]
         return labels
 
     def createEdgeLabels(self, nbunch=None):  # for network vidsualization
@@ -615,82 +595,12 @@ class Mip:
         if nbunch is None:
             nbunch = self.mip.nodes()
         for n1, n2, data in self.mip.edges(data=True):
-            if ((n1 in nbunch) & (n2 in nbunch)):
+            if n1 in nbunch and n2 in nbunch:
                 edge = (n1, n2)
                 if data['weight'] > 0:
                     labels[edge] = data['weight']
         return labels
 
-
-#    def drawMIP(self, filename):
-#        
-#        G = self.mip
-#        
-#        pos = nx.spring_layout(G)
-#        self.pos = pos
-#        self.drawn = True
-#        nx.draw_networkx_nodes(G,self.pos,nodelist=self.nodeIDsToObjectsIds.keys(),node_size=300,font_size = 9, node_color='blue')
-#        nx.draw_networkx_nodes(G,self.pos,nodelist=self.nodeIDsToUsersIds.keys(),node_size=300,font_size = 9,node_color='black')
-#
-#        nx.draw_networkx_edges(G,self.pos,edgelist=G.edges())
-#        
-#        nodeLabels = self.createNodeLabels()
-#        nx.draw_networkx_labels(G,self.pos,labels = nodeLabels, font_color = "white")
-#        
-#        edgeLabels = self.createEdgeLabels()
-#        nx.draw_networkx_edge_labels(G, pos, edgeLabels)
-#
-#
-#        plt.draw()
-#        plt.savefig(filename)
-#        plt.clf()
-#        plt.close()
-#        
-#    def drawMipObjects(self, filename):
-#        G = self.mip
-#        
-#        pos = nx.spring_layout(G)
-#        self.pos = pos
-#        self.drawn = True
-#        nx.draw_networkx_nodes(G,self.pos,nodelist=self.nodeIDsToObjectsIds.keys(),node_size=300,font_size = 9, node_color='blue')
-#
-#        nx.draw_networkx_edges(G,self.pos,edgelist=G.edges())
-#        
-#        nodeLabels = self.createNodeLabels(nodeTypes = 'object')
-#        nx.draw_networkx_labels(G,self.pos,labels = nodeLabels, font_color = "white")
-#        
-#        edgeLabels = self.createEdgeLabels(nodeLabels.keys())
-#        nx.draw_networkx_edge_labels(G, pos, edgeLabels,font_size = 7)
-#
-#
-#        plt.draw()
-#        plt.savefig(filename)
-#        plt.clf()
-#        plt.close()  
-#        
-#    def drawMipForUser(self, filename, user):
-#        G = self.mip
-#        
-#        pos = nx.spring_layout(G)
-#        self.pos = pos
-#        self.drawn = True
-#        nodesToDraw = nx.neighbors(G, self.users[user])
-#        nodesToDraw.append(self.users[user])
-#        nx.draw_networkx_nodes(G,self.pos,nodelist=nodesToDraw,node_size=300,font_size = 9, node_color='blue')
-#
-#        nx.draw_networkx_edges(G,self.pos,edgelist=G.edges())
-#        
-#        nodeLabels = self.createNodeLabels(nodeTypes = 'both')
-#        nx.draw_networkx_labels(G,self.pos,labels = nodeLabels, font_color = "white")
-#        
-#        edgeLabels = self.createEdgeLabels(nodeLabels.keys())
-#        nx.draw_networkx_edge_labels(G, pos, edgeLabels,font_size = 7)
-#
-#
-#        plt.draw()
-#        plt.savefig(filename)
-#        plt.clf()
-#        plt.close()          
 
 if __name__ == '__main__':
     pass

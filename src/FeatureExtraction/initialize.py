@@ -10,7 +10,6 @@ def main(repo_path):
     codeGraph = Csr()
 
     for commit in git.repo_iterate_commits(repo_path):
-        # print(commit.sha)
         actions = list(codeGraph.apply_changes_from_commit(commit))
         graph.updateMIP(Session(commit.committer, actions, commit.date))
 
