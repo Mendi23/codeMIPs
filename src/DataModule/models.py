@@ -1,5 +1,3 @@
-from DataModule.DataManipulation import create_changes_from_file
-
 
 class Base:
     def __init__(self):
@@ -43,11 +41,12 @@ class Repo(Base):
 class User(Base):
     def __init__(self):
         super().__init__()
-        self.login = None
-        self.repos_url = None
-        self.public_repos = None
-        self.followers = None
-        self.following = None
+        self.name = None
+        self.email = None
+        # self.login = None
+        # self.public_repos = None
+        # self.followers = None
+        # self.following = None
 
 class CommitPartial(Base):
     """
@@ -58,10 +57,10 @@ class CommitPartial(Base):
 
     {
         commit: {
-            comitter: {name, email, date},
+            committer: {name, email, date},
             tree (Base), message,
         },
-        comitter: { login, type },
+        committer: { login, type },
     }
     """
 
@@ -73,13 +72,16 @@ class CommitPartial(Base):
         self.tree = None
 
     def _hooks(self, json):
-        self.committer = User.create(json["committer"])
-
         assert json["commit"] is not None
         commit = json["commit"]
         self.tree = Base.create(commit["tree"])
         self.message = commit["message"]
         self.date = commit["committer"]["date"]
+        try:
+            self.committer = User.create(commit["committer"])
+        except:
+            print(json)
+            raise
 
 
 
@@ -95,10 +97,6 @@ class Commit(CommitPartial):
         super()._hooks(json)
         self.files = [FileChangeset.create(f) for f in json["files"]]
 
-    def iterate_changes(self):
-        for file in self.files:
-            yield from create_changes_from_file(file)
-
 class FileChangeset(Base):
     def __init__(self):
         super().__init__()
@@ -111,9 +109,3 @@ class FileChangeset(Base):
         self.contents_url = None
         self.raw_url = None
         self.previous_filename = None
-
-
-class Change:
-    def __init__(self):
-        self.segment = None
-        self.type = None

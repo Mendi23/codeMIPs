@@ -380,7 +380,7 @@ class Mip:
         aoList = self.getLiveAos()  # gets the MIP NODES that represent live objects
         notificationsList = []  # will hold list of objects, eventually sorted by interest
         for ao in aoList:
-            doi = self.DegreeOfInterestMIPs(user, ao, self.centrality)
+            doi = self.DegreeOfInterestMIPs(user, ao)
 
             if len(notificationsList) == 0:
                 toAdd = []
