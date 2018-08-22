@@ -18,9 +18,9 @@ class Csr:
             if file.status == 'deleted':
                 objId = self.mapping.pop(file.filename)
             else:
-                objId = self.mapping[file.filename]
                 if file.status == 'renamed':
                     self.mapping.rename(file.previous_filename, file.filename)
+                objId = self.mapping[file.filename]
 
             yield Action(objId, file.status)
 
