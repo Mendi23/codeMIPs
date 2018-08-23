@@ -1,6 +1,6 @@
 from DataModule.DataQuery import Query
+from GeneralMIP import Mip
 from Entities import Session
-from MIP import Mip
 from CSR import Csr
 
 
@@ -10,8 +10,10 @@ def main(repo_path):
     codeGraph = Csr()
 
     for commit in git.repo_iterate_commits(repo_path):
-        actions = list(codeGraph.apply_changes_from_commit(commit))
-        graph.updateMIP(Session(commit.committer, actions, commit.date))
+        session = Session(commit.committer, commit.date)
+        for a in codeGraph.apply_changes_from_commit(commit):
+            session.addAction(a)
+        graph.updateMIP(session)
 
 
     for id, _ in graph.rankObjectsForUser("urielha"):
