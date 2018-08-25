@@ -24,10 +24,12 @@ class Mip:
         self.objects = {}  # object ids
         self.iteration = 0
         self.lastID = -1
+        # ASK: should the decay be dynamic and take into account both time and iterations?
         self.decay = decay  # determines how much to decay weights when there is not interaction between two nodes over time
         self.objectsInc = 1.0  # weight increment
         self.centrality = None  # centrality values of all nodes
         self.log = []  # log holds all the session data
+        # ASK: are the parameter set or need learning?
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
         self.beta1 = beta1  # weight given to the proximity between the user and the object
         self.beta2 = beta2  # weight given to the proximity between the focus object and the object
@@ -35,6 +37,7 @@ class Mip:
         self.nodeIDsToObjectsIds = {}  # dictionary mapping between ids of nodes and object ids
         self.nodeIDsToUsersIds = {}  # dictionary mapping between ids of nodes and user ids
 
+        # ASK: what are the efffect of different similarityMetric?
         if similarityMetric == "edge":
             self.similarityMetric = self.edgeBasedProximity
         elif similarityMetric == "adamic":
@@ -48,14 +51,17 @@ class Mip:
     def update(self, session):  # to fit System API
         self.updateMIP(session)
 
-    def getLiveAos(self):  # generator of mip nodes that represent live object
-        yield from (node[0] for node in self.mip.nodes(data=True) if node[1]['node_type'] == 'object' and node[1]['deleted'] == 0)
+    def getLiveAos(self, user=None):  # generator of mip nodes that represent live object
+        nodes = nx.descendants(self.mip, self.users[user]) if user is not None else self.mip.nodes(data=True)
+        yield from (node[0] for node in nodes if node[1]['node_type'] == 'object' and node[1]['deleted'] == 0)
 
     def addUser(self, user_name):
         if user_name not in self.users:
             self.lastID += 1
             self.users[user_name] = self.lastID
-            attr = {'node_type': 'user', }
+            # ASK: if a new user joins, should we make "last_visit" to be cuurent iteration instead of 0?
+            attr = {'node_type': 'user',
+                    'last_visit': 0}
             self.mip.add_node(self.lastID, attr)
             self.nodeIDsToUsersIds[self.lastID] = user_name
         return self.users[user_name]
@@ -65,7 +71,7 @@ class Mip:
             self.lastID += 1
             self.objects[object_id] = self.lastID
             attr = {'node_type': 'object',
-                    'deleted': 0,
+                    'deleted': False,
                     'revisions': []
                     }
             self.mip.add_node(self.lastID, attr)
@@ -73,15 +79,18 @@ class Mip:
         return self.objects[object_id]
 
     def updateMIP(self, session):
+        self.iteration += 1
         # initialize 'updated' attribute of all edges to false
         for edge in self.mip.edges_iter(data=True):
             edge[2]['updated'] = 0
 
         self.log.append(session)  # append session to log
         user = session.user
-        if user not in self.users:
+
+        if user not in self.users:  # add user of not exist
             self.addUser(user)
         user_node = self.users[user]
+        self.mip.node[user_node]['last_visit'] = self.iteration
         # update MIP based on all actions
         changedAOs = []
         for act in session.actions:
@@ -90,7 +99,7 @@ class Mip:
                 nodeIdInMip = self.addObject(ao)
                 act.updateMipNodeID(nodeIdInMip)
             ao_node = self.objects[ao]
-            if self.iteration not in self.mip.node[ao_node]['revisions']:
+            if self.iteration != self.mip.node[ao_node]['revisions'][-1]:
                 self.mip.node[ao_node]['revisions'].append(self.iteration)  # add revision
             self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)
             changedAOs.append(ao_node)
@@ -110,8 +119,10 @@ class Mip:
                     elif edge[2]['edge_type'] == 'u-ao':
                         if edge[0] == user_node or edge[1] == user_node:
                             edge[2]['weight'] = max(edge[2]['weight'] - self.decay, 0)
-        #        self.centrality = nx.degree_centrality(self.mip) #TODO: apriori importance for now is simply degree, consider reverting to more complex option
-        self.iteration += 1
+        # ASK: about centrality update and to-do
+        #        self.centrality = nx.degree_centrality(self.mip)
+        # #TODO: apriori importance for now is simply degree, consider reverting to more complex option
+
         if self.alpha > 0:
             try:
                 self.centrality = nx.current_flow_betweenness_centrality(self.mip, True, weight='weight')
@@ -303,19 +314,15 @@ class Mip:
         R = nx.all_simple_paths(self.mip, s, t, cutoff=3)
         proximity = 0.0
         for r in R:
-            PathWeight = self.mip.degree(r[0]) * (self.PathProb(
-                r))  # check whether the degree makes a difference, or is it the same for all paths??
+            PathWeight = self.mip.degree(r[0]) * (self.PathProb(r))  # check whether the degree makes a difference, or is it the same for all paths??
             proximity = proximity + PathWeight
 
         return proximity
 
-    # TODO: FUNC
     def PathProb(self, path):
         prob = 1.0
         for i in range(len(path) - 1):
-            prob = prob * (
-                    float(self.mip[path[i]][path[i + 1]]['weight']) / self.mip.degree(path[i]))
-        #        print 'prob' + str(prob)
+            prob *= float(self.mip[path[i]][path[i + 1]]['weight']) / self.mip.degree(path[i])
         return prob
 
     '''
@@ -323,27 +330,53 @@ class Mip:
     will be a component taken into account in degree of interest 
     '''
 
-    # TODO: FUNC
+    # Quiestion about this function and it's relevant's for code:
     def changeExtent(self, userId, aoNode):
         fromRevision = 0  # in case user does not exist yet or has never known about this object, start from revision 0
         if userId in self.users and self.mip.has_edge(self.users[userId], aoNode):
             userNode = self.users[userId]
             if self.mip.has_edge(userNode, aoNode):
                 fromRevision = self.mip[userNode][aoNode]['lastKnown']  # get the last time the user knew what the value of the object was
+        # ASK: this all function seems to be wrong. lastKnown is noe last_visit and the calcaluations need adjusting
         revs = self.mip.node[aoNode]['revisions']
-        i = 0
-        while revs[i] < fromRevision:
-            i += 1
-            if i >= len(revs) - 1:
-                break
 
-        if i < len(revs) - 1:
-            res = (len(revs) - 1 - i) / float((self.iteration - fromRevision))
-            if fromRevision == revs[len(revs) - 1]:
-                print('hold on')
-            return res
-        else:
-            return 0
+        # this message should't print. shouldn't we return 0?
+        if revs[-1] == fromRevision:
+            print(f"This code last changed by the user {userId} himself!")
+
+        # does number of chenges should be weighted by size of change???
+        numOfChanges = sum(1 for i in revs if i > fromRevision)
+        return numOfChanges / float((self.iteration - fromRevision))
+
+    # ASK: what the fuck with the mountains of code I had to delete??
+    # ASK: what should be the default limit?
+    # ASK: should we allow repeated requests (meaning not discarding all changes as seen after the first request)
+    def rankObjects(self, user):
+        if user not in self.users:
+            print("this is a new user! getting default rankings")
+            return self.getDefaultRankings()
+        # ASK: if we do want to add "a runing changelog", need a basic value for new joinees. plus: new changes need to cancel old ones.
+
+        tupledAos = ((ao, self.DegreeOfInterestMIPs(user, ao)) for ao in self.getLiveAos(user))
+        return sorted(tupledAos, key=lambda x: x[1])
+
+    def rankChanges(self, user, time=None):
+        if user not in self.users:
+            print("this is a new user! getting last changes")
+            return self.getLastChanges()
+
+        if time is None and user in self.users:
+            time = self.mip.node[user]['last_visit']
+
+        return list(x for x in self.rankObjects(user) if self.)
+
+    # TODO: Implament
+    def getLastChanges(self):
+        pass
+
+    # TODO: Implament
+    def getDefaultRankings(self):
+        pass
 
     '''
     rank all live objects based on DOI to predict what edits a user will make.
