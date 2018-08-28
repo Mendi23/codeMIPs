@@ -7,28 +7,30 @@ from bs4 import BeautifulSoup
 import DataModule.models as Models
 from DataModule.utils import *
 
+PER_PAGE = 10
+
 BASE_URL = "https://api.github.com"
 KNOWN_SMALL_REPOS = [
-    "/Microsoft/DirectXShaderCompiler ",
-    "/fragglet/c-algorithms",
-    "/TheAlgorithms/C-Plus-Plus",
-    "/TheAlgorithms/C",
-    "/nlohmann/json",
-    "/stedolan/jq",
-    "/mozilla/DeepSpeech",
-    "/Alexpux/mingw-w64",
+    "Microsoft/DirectXShaderCompiler",
+    "fragglet/c-algorithms",
+    "TheAlgorithms/C-Plus-Plus",
+    "TheAlgorithms/C",
+    "nlohmann/json",
+    "stedolan/jq",
+    "mozilla/DeepSpeech",
+    "Alexpux/mingw-w64",
 ]
 KNOWN_BIG_REPOS = [
-    "/torvalds/linux",
-    "/videolan/vlc",
-    "/tensorflow/tensorflow",
-    "/nginx/nginx",
-    "/electron/electron",
-    "/bitcoin/bitcoin",
-    "/google/protobuf",
-    "/mozilla/rr",
-    "/mozilla/gecko-dev",
-    "/Microsoft/ELL",
+    "torvalds/linux",
+    "videolan/vlc",
+    "tensorflow/tensorflow",
+    "nginx/nginx",
+    "electron/electron",
+    "bitcoin/bitcoin",
+    "google/protobuf",
+    "mozilla/rr",
+    "mozilla/gecko-dev",
+    "Microsoft/ELL",
 ]
 
 
@@ -42,16 +44,11 @@ class Query:
     def __init__(self):
         self._g = GitHub()
 
-    def _get_last_page(self, partial_req):
-        has_next = lambda headers: any(
-            h for h in headers if "Link" in h and "next" in h[1])
-
-        for pageNum in itertools.count(1):
-            res = partial_req.get(page=pageNum)
-            headers = self._g.getheaders()
-            assert res[0] == 200
-            if not has_next(headers):
-                return pageNum
+    def _get_last_page(self):
+        headers = self._g.getheaders()
+        link = next(h for h in headers if "Link" in h)
+        match = re.search(r'page=(\d+)[^;]+; rel="last"', link[1])
+        return int(match.group(1))
 
     def get_user(self, useruri):
         """
@@ -83,7 +80,7 @@ class Query:
 
         # 1. get the repo api:
         res = self._g.repos[repouri].get()
-        assert res[0] == 200
+        assert res[0] == 200, res
         repo = Models.Repo.create(res[1])
 
         # 2. fetch full html page
@@ -111,10 +108,11 @@ class Query:
         if maxPage is not None:
             lastPage = maxPage
         else:
-            lastPage = self._get_last_page(self._g.repos[repouri].commits)
+            self._g.repos[repouri].commits.get(per_page=PER_PAGE)
+            lastPage = self._get_last_page()
 
         for pageNum in range(lastPage, 0, -1):
-            res = self._g.repos[repouri].commits.get(page=pageNum)
+            res = self._g.repos[repouri].commits.get(per_page=PER_PAGE, page=pageNum)
             assert res[0] == 200
 
             for commit in reversed([Models.CommitPartial.create(c) for c in res[1]]):
@@ -184,6 +182,7 @@ if __name__ == "__main__":
     # print(commit)
 
     de = DataExtractor("Storage")
+    # gen = de.get_train_test_generator(KNOWN_SMALL_REPOS[1])
     gen = de.get_train_test_generator("urielha/SimpleObjectAppender")
     i = itertools.count(1)
     print("train:")

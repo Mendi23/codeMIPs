@@ -30,7 +30,7 @@ class Base:
         return c
 
     def serialize(self):
-        return self.__dict__
+        return {k:v for k,v in self.__dict__.items() if v is not None}
 
 
 class Repo(Base):
@@ -123,9 +123,11 @@ class FileChangeset(Base):
 
     def _hooks(self, json, objectLoaded):
         if objectLoaded:
-            self.patch = gzip.decompress(base64.b64decode(self.patch.encode())).decode()
+            decoded = base64.b64decode(str(self.patch).encode())
+            self.patch = gzip.decompress(decoded).decode()
 
     def serialize(self):
         json = super().serialize()
-        json["patch"] = base64.b64encode(gzip.compress(self.patch.encode())).decode()
+        compressed = gzip.compress(str(self.patch).encode())
+        json["patch"] = base64.b64encode(compressed).decode()
         return json
