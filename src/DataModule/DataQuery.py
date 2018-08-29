@@ -135,9 +135,8 @@ class DataExtractor:
         if storage.commits_len < 0:
             storage.commits_len = self._query.repo_num_of_commits(repouri)
 
-        generator = iter(self._iter_pages(storage, repouri))
         return Gen(int(storage.commits_len * self.ratio),
-                   generator)
+                   self._iter_pages(storage, repouri))
 
     def _iter_pages(self, storage: Storage, repouri):
         pages = storage.get_pages()

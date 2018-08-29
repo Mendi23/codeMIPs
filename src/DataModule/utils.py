@@ -2,6 +2,12 @@ import json, os, re
 import DataModule.models as Models
 
 
+def _get_valid_filename(orig):
+    s = str(orig).strip().replace(" ", "_")
+    s = re.sub(r"[\\/]", "_", s)
+    return re.sub(r"(?u)[^-\w.]", "", s)
+
+
 class _CustomJsonEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, Models.Base):
@@ -38,9 +44,8 @@ class Storage:
         return savedir
 
     def __init__(self, savedir, repouri):
-        self.savedir = savedir
-        repouri_valid = self.get_valid_filename(repouri)
-        repo_dir = os.path.join(self.savedir, repouri_valid)
+        repouri_valid = _get_valid_filename(repouri)
+        repo_dir = os.path.join(savedir, repouri_valid)
         if not os.path.isdir(repo_dir):
             os.mkdir(repo_dir)
 
@@ -48,11 +53,6 @@ class Storage:
         self.head_name = os.path.join(repo_dir, "commits_num.txt")
         self.conf = {}
         self.load()
-
-    def get_valid_filename(self, orig):
-        s = str(orig).strip().replace(" ", "_")
-        s = re.sub(r"[\\/]", "_", s)
-        return re.sub(r"(?u)[^-\w.]", "", s)
 
     def load(self):
         exists = os.path.exists
@@ -92,7 +92,7 @@ class Storage:
 
     def add_page(self, page, commits):
         key = self.SEC_COMMITS
-        page_num = page
+        page_num = int(page)
         if page_num in self.conf[key]:
             print(f"Warning: overwriting a page num: {page}")
         data = self.conf[key][page_num] = json.dumps([page_num, commits], indent=2,
@@ -108,7 +108,7 @@ class Storage:
 class Gen:
     def __init__(self, stop, gen):
         self.stop = stop
-        self._gen = gen
+        self._gen = iter(gen)
         self.i = 0
 
     def __iter__(self):
