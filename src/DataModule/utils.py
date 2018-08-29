@@ -64,11 +64,12 @@ class Storage:
             if len(data) > 0:
                 self.conf[self.SEC_HEAD] = data
 
+
         self.file = open(self.file_name, "r+")
         data = self.file.read()
         self.conf[self.SEC_COMMITS] = {
-            page: _decode_commit_list(commits)
-            for page, commits in enumerate(_decode_stacked(data))
+            int(page): _decode_commit_list(commits)
+            for page, commits in _decode_stacked(data)
         }
 
     @property
@@ -92,7 +93,8 @@ class Storage:
         page_num = page
         if page_num in self.conf[key]:
             print(f"Warning: overwriting a page num: {page}")
-        data = self.conf[key][page_num] = json.dumps(commits, indent=2, cls=_CustomJsonEncoder)
+        data = self.conf[key][page_num] = json.dumps([page_num, commits], indent=2,
+                                                     cls=_CustomJsonEncoder)
         self.file.write(os.linesep)
         self.file.write(data)
         self.file.flush()
