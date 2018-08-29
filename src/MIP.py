@@ -11,6 +11,7 @@ from itertools import combinations
 import networkx as nx
 import math
 
+#ASK: we ignored all "focus" based actions
 
 class Mip:
     """
@@ -87,7 +88,7 @@ class Mip:
         self.log.append(session)  # append session to log
         user = session.user
 
-        if user not in self.users:  # add user of not exist
+        if user not in self.users:  # add user if not exist
             self.addUser(user)
         user_node = self.users[user]
         self.mip.node[user_node]['last_visit'] = self.iteration
@@ -121,92 +122,16 @@ class Mip:
                             edge[2]['weight'] = max(edge[2]['weight'] - self.decay, 0)
         # ASK: about centrality update and to-do
         #        self.centrality = nx.degree_centrality(self.mip)
-        # #TODO: apriori importance for now is simply degree, consider reverting to more complex option
+        # #ASK: _TODO: apriori importance for now is simply degree, consider reverting to more complex option
 
         if self.alpha > 0:
             try:
+                # ASK: What?
                 self.centrality = nx.current_flow_betweenness_centrality(self.mip, True, weight='weight')
             except nx.NetworkXError:
                 self.centrality = nx.degree_centrality(self.mip)
         else:
             self.centrality = nx.degree_centrality(self.mip)
-
-    '''
-    querying the mip net for the top ranked objects
-    @user: the id of the user
-    @infoLimit: communication budget (how many objects to share)
-    @startRev: which revision to start from, 0 by default
-    @node: the focus object (if given)
-    @onlyChanged: whether to consider sharing only objects that were changed or also objects that might be relevant but
-     haven't changed since the user last interacted with the system
-    '''
-
-    # TODO: FUNC
-    def query(self, user, infoLimit, startRev=0, node=None, onlyChanged=True):  # to fit System API
-        if node is None:  # rankedObjects = self.rankChangesForUser(user, startRev)
-            rankedObjects = self.rankChangesForUserLastKnown(user, startRev, onlyChanged=onlyChanged)
-        else:
-            rankedObjects = self.rankAllGivenUserFocus(user, node, startRev, onlyChanged=onlyChanged)
-
-        # commented out section below is the inclusion of one node that is *far* from the agent. probably doesn't make sense for the simulation now.
-        #        if node is None:
-        #            nodesToShare = rankedObjects[:infoLimit-1]
-        #            if len(rankedObjects)>0:
-        #                nodesToShare.append(rankedObjects[len(rankedObjects)-1])
-        #        else:
-        #            nodesToShare = rankedObjects[:infoLimit]
-
-        nodesToShare = rankedObjects[:infoLimit]
-        nodes = [i[0] for i in nodesToShare]
-        #
-        #        for node in nodes:
-        #            if user not in self.users.keys():
-        #                self.addUser(user)
-        #            self.updateEdge(self.users[user], self.objects[node], 'u-ao', 0) #update the latest revision when the user was informed about the object
-
-        return nodes
-
-    # TODO: FUNC
-    def queryList(self, user, infoLimit, startRev=0, node=None,
-                  onlyChanged=True):  # to fit System API
-        if node is None:
-            #            rankedObjects = self.rankChangesForUser(user, startRev)
-            rankedObjects = self.rankChangesForUserLastKnown(user, startRev,
-                onlyChanged=onlyChanged)
-        else:
-            rankedObjects = self.rankAllGivenUserFocus(user, node, startRev,
-                onlyChanged=onlyChanged)
-
-        # commented out section below is the inclusion of one node that is *far* from the agent. probably doesn't make sense for the simulation now.
-        #        if node is None:
-        #            nodesToShare = rankedObjects[:infoLimit-1]
-        #            if len(rankedObjects)>0:
-        #                nodesToShare.append(rankedObjects[len(rankedObjects)-1])
-        #        else:
-        #            nodesToShare = rankedObjects[:infoLimit]
-
-        nodesToShare = rankedObjects
-        nodes = [i[0] for i in nodesToShare]
-        #
-        #        for node in nodes:
-        #            if user not in self.users.keys():
-        #                self.addUser(user)
-        #            self.updateEdge(self.users[user], self.objects[node], 'u-ao', 0) #update the latest revision when the user was informed about the object
-
-        return nodes
-
-    '''
-    MIP-update procedure, runs after each user session, updates weights between edges
-    
-    session:
-    @user - name of user
-    @actions - list of:
-        action:
-        @ao - id of the object the action was preformed on
-        @actType - 'delete', 
-        @updateMipNodeID - method which recieves the id of the object in the graph
-        @weightInc - weight of the action (to be added to the edge)
-    '''
 
     def updateEdge(self, i1, i2, edge_type, increment=1.0):
         if self.mip.has_edge(i1, i2):
@@ -231,7 +156,6 @@ class Mip:
     Computes degree of interest between a user and an object
     gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
     '''
-
     def DegreeOfInterestMIPs(self, user, obj):
         api_obj = self.centrality[obj]  # node centrality (apriori component)
         # compute proximity between user node and object node using Cycle-Free-Edge-Conductance from Koren et al. 2007 or Adamic/Adar
@@ -245,45 +169,16 @@ class Mip:
 
         return self.alpha * api_obj + self.beta1 * proximity + self.gamma * changeExtent  # TODO: check that scales work out, otherwise need some normalization
 
-    # TODO: FUNC
-    def DegreeOfInterestMIPsFocus(self, user, obj, focus_obj):
-        api_obj = self.centrality[obj]
-        focus_proximity = 0.0
-        try:
-            if self.similarityMetric == 'simple':
-                focus_proximity = self.simpleProximity(focus_obj, obj)  # node centrality (apriori component)
-            else:
-                focus_proximity = self.edgeBasedProximity(focus_obj, obj)
-        except:
-            print('here')
 
-        # compute proximity between user node and object node using Cycle-Free-Edge-Conductance from Koren et al. 2007 or Adamic/Adar
-        proximity = 0.0
-        if ((user in self.users) & (
-                self.beta1 > 0)):  # no point to compute proximity if beta1 is 0... (no weight)
-            userNodeID = self.users[user]
-            if self.similarityMetric == "adamic":
-                proximity = self.adamicAdarProximity(userNodeID, obj)  # Adamic/Adar proximity
-            elif self.similarityMetric == 'simple':
-                #                proximity = self.CFEC(userNodeID,obj) #cfec proximity
-                proximity = self.simpleProximity(userNodeID, obj)
-            else:
-                proximity = self.edgeBasedProximity(userNodeID, obj)
-        changeExtent = 0.0
-        if self.gamma > 0:  # need to consider how frequently the object has been changed since user last known about it: user is userId (might not be in MIP), obj is object Node id
-            changeExtent = self.changeExtent(user, obj)
-
-        return self.alpha * api_obj + self.beta1 * proximity + self.beta2 * focus_proximity + self.gamma * changeExtent  # TODO: check that scales work out, otherwise need some normalization
-
-    '''
-    computes Adamic/Adar proximity between nodes, adjusted to consider edge weights
-    here's adamic/adar implementation in networkx. Modifying to consider edge weights            
-    def predict(u, v):
-        return sum(1 / math.log(G.degree(w))
-                   for w in nx.common_neighbors(G, u, v))
-    '''
 
     def adamicAdarProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
+        '''
+        computes Adamic/Adar proximity between nodes, adjusted to consider edge weights
+        here's adamic/adar implementation in networkx. Modifying to consider edge weights
+        def predict(u, v):
+            return sum(1 / math.log(G.degree(w))
+                       for w in nx.common_neighbors(G, u, v))
+        '''
         proximity = 0.0
         for node in nx.common_neighbors(self.mip, s, t):
             weights = self.mip[s][node]['weight'] + self.mip[t][node]['weight']  # the weight of the path connecting s and t through the current node
@@ -304,34 +199,34 @@ class Mip:
             edgeProximity = self.mip[s][t]['weight'] / self.mip.degree(s, weight='weight')
         return edgeWeight * edgeProximity + (1 - edgeWeight) * simpleProximity
 
-    '''
-    computes Cycle-Free-Edge-Conductance from Koren et al. 2007
-    for each simple path, we compute the path probability (based on weights) 
-    '''
 
-    # TODO: FUNC
-    def CFEC(self, s, t):
-        R = nx.all_simple_paths(self.mip, s, t, cutoff=3)
-        proximity = 0.0
-        for r in R:
-            PathWeight = self.mip.degree(r[0]) * (self.PathProb(r))  # check whether the degree makes a difference, or is it the same for all paths??
-            proximity = proximity + PathWeight
+    # ASK: What is CFEC and do we need it?
+    # def CFEC(self, s, t):
+    # '''
+    # computes Cycle-Free-Edge-Conductance from Koren et al. 2007
+    # for each simple path, we compute the path probability (based on weights)
+    # '''
+    #     R = nx.all_simple_paths(self.mip, s, t, cutoff=3)
+    #     proximity = 0.0
+    #     for r in R:
+    #         PathWeight = self.mip.degree(r[0]) * (self.PathProb(r))  # check whether the degree makes a difference, or is it the same for all paths??
+    #         proximity += PathWeight
+    #     return proximity
+    #
+    # def PathProb(self, path):
+    #     prob = 1.0
+    #     for i in range(len(path) - 1):
+    #         prob *= float(self.mip[path[i]][path[i + 1]]['weight']) / self.mip.degree(path[i])
+    #     return prob
 
-        return proximity
 
-    def PathProb(self, path):
-        prob = 1.0
-        for i in range(len(path) - 1):
-            prob *= float(self.mip[path[i]][path[i + 1]]['weight']) / self.mip.degree(path[i])
-        return prob
 
-    '''
-    computes the extent/frequency to which an object was changed since the last time the user was notified about it
-    will be a component taken into account in degree of interest 
-    '''
-
-    # Quiestion about this function and it's relevant's for code:
+    #ASK: questions about this function and it's relevant's for code:
     def changeExtent(self, userId, aoNode):
+        '''
+        computes the extent/frequency to which an object was changed since the last time the user was notified about it
+        will be a component taken into account in degree of interest
+        '''
         fromRevision = 0  # in case user does not exist yet or has never known about this object, start from revision 0
         if userId in self.users and self.mip.has_edge(self.users[userId], aoNode):
             userNode = self.users[userId]
@@ -351,11 +246,6 @@ class Mip:
     # ASK: what the fuck with the mountains of code I had to delete??
     # ASK: what should be the default limit?
     # ASK: should we allow repeated requests (meaning not discarding all changes as seen after the first request)
-    '''
-    rank all live objects based on DOI to predict what edits a user will make.
-    NOTE: need to call this function with the mip prior to the users' edits!!!
-    '''
-
     # ASK: comment from previous function. why need to call this function first?
     def rankObjects(self, user):
         if user not in self.users:
