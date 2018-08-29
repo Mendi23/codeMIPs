@@ -63,15 +63,18 @@ class CommitPartial(Base):
 
     {
         commit: {
+            author: {name, email, date},
             committer: {name, email, date},
             tree (Base), message,
         },
+        author: { login, type },
         committer: { login, type },
     }
     """
 
     def __init__(self):
         super().__init__()
+        self.author = User()
         self.committer = User()
         self.message = None
         self.date = None
@@ -90,6 +93,7 @@ class CommitPartial(Base):
 
         try:
             self.committer = User.create(commit["committer"], objectLoaded)
+            self.author = User.create(commit["author"], objectLoaded)
         except:
             print(json)
             raise

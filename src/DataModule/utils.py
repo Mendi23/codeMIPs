@@ -8,6 +8,7 @@ class _CustomJsonEncoder(json.JSONEncoder):
             return o.serialize()
         return json.JSONEncoder.default(self, o)
 
+
 def _decode_stacked(document, pos=0, decoder=json.JSONDecoder()):
     NOT_WHITESPACE = re.compile(r'[^\s]')
     while True:
@@ -18,6 +19,7 @@ def _decode_stacked(document, pos=0, decoder=json.JSONDecoder()):
 
         obj, pos = decoder.raw_decode(document, pos)
         yield obj
+
 
 def _decode_commit_list(o):
     return [Models.Commit.create(c, True) for c in o]
@@ -64,12 +66,12 @@ class Storage:
             if len(data) > 0:
                 self.conf[self.SEC_HEAD] = data
 
-
         self.file = open(self.file_name, "r+")
         data = self.file.read()
         self.conf[self.SEC_COMMITS] = {
             int(page): _decode_commit_list(commits)
             for page, commits in _decode_stacked(data)
+            if any(commits)
         }
 
     @property

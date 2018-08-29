@@ -125,7 +125,8 @@ class Query:
 
 class DataExtractor:
 
-    def __init__(self, savedir):
+    def __init__(self, savedir, ratio=None):
+        self.ratio = ratio if ratio is not None else 0.75
         self._query = Query()
         self.savedir = Storage.init_save_dir(savedir)
 
@@ -135,7 +136,7 @@ class DataExtractor:
             storage.commits_len = self._query.repo_num_of_commits(repouri)
 
         generator = iter(self._iter_pages(storage, repouri))
-        return Gen(int(storage.commits_len * 0.75),
+        return Gen(int(storage.commits_len * self.ratio),
                    generator)
 
     def _iter_pages(self, storage: Storage, repouri):
@@ -159,7 +160,7 @@ class DataExtractor:
             commits.append(commit)
             yield commit
 
-        if lastpage is not None:
+        if lastpage is not None and any(commits):
             storage.add_page(lastpage, commits)
 
         storage.dispose()
