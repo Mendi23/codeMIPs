@@ -48,12 +48,12 @@ class Mip:
             raise ValueError('Didn\'t defined a valid similarity metric')
         # how to measure proximity/similarity in the newtork
 
-    def update(self, session):  # to fit System API
-        self.updateMIP(session)
-
     def getLiveAos(self, user=None):  # generator of mip nodes that represent live object
-        nodes = nx.descendants(self.mip, self.users[user]) if user is not None else self.mip.nodes(data=True)
-        yield from (node[0] for node in nodes if node[1]['node_type'] == 'object' and node[1]['deleted'] == 0)
+        nodes = nx.descendants(self.mip, self.users[user]) if user is not None \
+            else self.mip.nodes(data=True)
+
+        yield from (node[0] for node in nodes \
+                    if node[1]['node_type'] == 'object' and node[1]['deleted'] == 0)
 
     def addUser(self, user_name):
         if user_name not in self.users:
@@ -351,6 +351,12 @@ class Mip:
     # ASK: what the fuck with the mountains of code I had to delete??
     # ASK: what should be the default limit?
     # ASK: should we allow repeated requests (meaning not discarding all changes as seen after the first request)
+    '''
+    rank all live objects based on DOI to predict what edits a user will make.
+    NOTE: need to call this function with the mip prior to the users' edits!!!
+    '''
+
+    # ASK: comment from previous function. why need to call this function first?
     def rankObjects(self, user):
         if user not in self.users:
             print("this is a new user! getting default rankings")
@@ -360,15 +366,18 @@ class Mip:
         tupledAos = ((ao, self.DegreeOfInterestMIPs(user, ao)) for ao in self.getLiveAos(user))
         return sorted(tupledAos, key=lambda x: x[1])
 
-    def rankChanges(self, user, time=None):
+    def rankChanged(self, user, time=None):
         if user not in self.users:
             print("this is a new user! getting last changes")
             return self.getLastChanges()
 
-        if time is None and user in self.users:
-            time = self.mip.node[user]['last_visit']
+        userNode = self.users[user]
+        if time is None:
+            time = self.mip.node[userNode]['last_visit']
 
-        return list(x for x in self.rankObjects(user) if self.)
+        changedAos = ((ao, self.DegreeOfInterestMIPs(user, ao))
+                      for ao in self.getLiveAos(user) if self.mip[ao]['revisions'][-1] > time)
+        return sorted(changedAos, key=lambda x: x[1])
 
     # TODO: Implament
     def getLastChanges(self):
@@ -378,152 +387,13 @@ class Mip:
     def getDefaultRankings(self):
         pass
 
-    '''
-    rank all live objects based on DOI to predict what edits a user will make.
-    NOTE: need to call this function with the mip prior to the users' edits!!!
-    '''
-
-    # TODO: FUNC
-    def rankObjectsForUser(self, user):
-        aoList = self.getLiveAos()  # gets the MIP NODES that represent live objects
-        notificationsList = []  # will hold list of objects, eventually sorted by interest
-        for ao in aoList:
-            doi = self.DegreeOfInterestMIPs(user, ao)
-            notificationsList = self._manipulateList(notificationsList, ao, doi)
-        return notificationsList
-
-    '''
-    rank only objects that have changed since the last time the user interacted (based on DOI to predict what edits a user will make.)
-    NOTE: need to call this function with the mip prior to the users' edits!!!
-    '''
-
-    # TODO: FUNC
-    def rankChangesForUser(self, user, time, onlySig=True):
-        notificationsList = []
-        checkedObjects = {}
-        for i in range(time, len(self.log)):  # this includes revision at time TIME and does  include last revision in MIP as we are querying before we update
-            #            print "time = "+str(i) + "author = "+self.log[i].user
-
-            session = self.log[i]
-            for act in session.actions:
-                if act.actType != 'smallEdit' or not onlySig:
-                    inNotificationList = False
-                    if act.ao not in checkedObjects:  # currently not giving more weight to the fact that an object was changed multiple times. --> removed because if there are both big and small changes etc...
-                        # TODO: possibly add check whether the action is notifiable
-
-                        doi = self.DegreeOfInterestMIPs(user, self.objects[act.ao])
-                        checkedObjects[act.ao] = doi
-                    else:
-                        doi = checkedObjects[act.ao]  # already computed doi, don't recompute!
-                        inNotificationList = True
-                    # put in appropriate place in list based on doi
-                    if len(notificationsList) == 0:
-                        toAdd = []
-                        toAdd.append(act.ao)
-                        toAdd.append(doi)
-                        notificationsList.append(toAdd)
-                    elif not inNotificationList:  # only add to list if wasn't already there (doi does not change)
-                        j = 0
-
-                        while doi < notificationsList[j][1]:
-                            j += 1
-                            if j >= len(notificationsList) - 1:
-                                break
-                        toAdd = []
-                        toAdd.append(act.ao)
-                        toAdd.append(doi)
-
-                        if j < len(notificationsList):
-                            notificationsList.insert(j, toAdd)
-                        else:
-                            notificationsList.append(toAdd)
-        return notificationsList
-
-    # TODO: FUNC
-    def rankChangesForUserLastKnown(self, user, time, onlyChanged=True, onlySig=True):
-        aoList = self.getLiveAos()  # gets the MIP NODES that represent live objects
-        notificationsList = []  # will hold list of objects, eventually sorted by interest
-        for ao in aoList:
-            changeExtentSinceLastKnown = self.changeExtent(user, ao)
-            if changeExtentSinceLastKnown != 0 or not onlyChanged:  # consider object only if it has changed at least once since agent last known about it
-                doi = self.DegreeOfInterestMIPs(user, ao)
-                notificationsList = self._manipulateList(notificationsList, ao, doi)
-        return notificationsList
-
-    # TODO: FUNC
-    def rankAllGivenUserFocus(self, user, focus_obj, time, onlyChanged=True):  # TODO: check correctness and try at some point
-        aoList = self.getLiveAos()  # gets the MIP NODES that represent live objects
-        notificationsList = []  # will hold list of objects, eventually sorted by interest
-        if focus_obj in self.objects.keys():
-            focus_ao = self.objects[focus_obj]
-            for ao in aoList:
-                changeExtentSinceLastKnown = self.changeExtent(user, ao)
-                if changeExtentSinceLastKnown != 0 or not onlyChanged:  # consider object only if it has changed at least once since agent last known about it
-                    if ao != focus_ao:  # consider object only if it has changed at least once since agent last known about it
-                        doi = self.DegreeOfInterestMIPsFocus(user, ao, focus_ao)
-                        notificationsList = self._manipulateList(notificationsList, ao, doi)
-            return notificationsList
-
-        else:
-            return self.rankChangesForUserLastKnown(user, time)
-
-    # TODO: FUNC
-    def rankChangesGivenUserFocus(self, user, focus_obj, time, onlySig=True):  # TODO: check correctness and try at some point
-        notificationsList = []
-        if focus_obj in self.objects.keys():
-            focus_ao = self.objects[focus_obj]
-
-            checkedObjects = {}
-            for i in range(time, len(self.log)):  # this includes revision at time TIME and does include last revision in MIP as we are querying before we update
-                session = self.log[i]
-                for act in session.actions:
-                    if act.actType != 'smallEdit' or not onlySig:
-                        inNotificationList = False
-                        if act.ao not in checkedObjects:  # currently not giving more weight to the fact that an object was changed multiple times. --> removed because if there are both big and small changes etc...
-                            # TODO: possibly add check whether the action is notifiable
-
-                            doi = self.DegreeOfInterestMIPsFocus(user, self.objects[act.ao], focus_ao)
-                            checkedObjects[act.ao] = doi
-                        else:
-                            doi = checkedObjects[act.ao]  # already computed doi, don't recompute!
-                            inNotificationList = True
-                        # put in appropriate place in list based on doi
-                        if len(notificationsList) == 0:
-                            toAdd = []
-                            toAdd.append(act.ao)
-                            toAdd.append(doi)
-                            notificationsList.append(toAdd)
-                        elif not inNotificationList:  # only add to list if wasn't already there (doi does not change)
-                            j = 0
-
-                            while doi < notificationsList[j][1]:
-                                j += 1
-                                if j >= len(notificationsList) - 1:
-                                    break
-                            toAdd = []
-                            toAdd.append(act.ao)
-                            toAdd.append(doi)
-
-                            if j < len(notificationsList):
-                                notificationsList.insert(j, toAdd)
-                            else:
-                                notificationsList.append(toAdd)
-            return notificationsList
-        else:
-            return self.rankChangesForUser(user, time, onlySig)
+    # ASK: can't we use user focus at all?
 
     '''
     -----------------------------------------------------------------------------
     MIPs reasoning functions end
     -----------------------------------------------------------------------------
     '''
-
-    def _manipulateList(self, notificationsList, ao, doi):
-        j = 0
-        while j < len(notificationsList) and doi < notificationsList[j][1]:
-            j += 1
-        notificationsList.insert(j, (self.nodeIDsToObjectsIds[ao], doi))
-        return notificationsList
 
     def __str__(self):
         return f"MIP_{self.alpha}_{self.beta1}_{self.beta2}_{self.gamma}_{self.decay}_{self.similarityMetric}"
