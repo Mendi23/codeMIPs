@@ -11,7 +11,9 @@ from itertools import combinations
 import networkx as nx
 import math
 
-#ASK: we ignored all "focus" based actions
+
+# ASK: we ignored all "focus" based actions. if we don't have focus object, how does the functions and beta_2 changes?
+# ASK: how can we use the attributes of a projec? a long tail, dominated changer, the user'r precentege of changes, etc.
 
 class Mip:
     """
@@ -51,10 +53,10 @@ class Mip:
 
     def getLiveAos(self, user=None):  # generator of mip nodes that represent live object
         nodes = nx.descendants(self.mip, self.users[user]) if user is not None \
-            else self.mip.nodes(data=True)
-
-        yield from (node[0] for node in nodes \
-                    if node[1]['node_type'] == 'object' and node[1]['deleted'] == 0)
+            else self.mip.nodes()
+        yield from (node for node in nodes \
+                    if self.mip.node[node]['node_type'] == 'object' \
+                    and self.mip.node[node]['deleted'] == 0)
 
     def addUser(self, user_name):
         if user_name not in self.users:
@@ -100,7 +102,8 @@ class Mip:
                 nodeIdInMip = self.addObject(ao)
                 act.updateMipNodeID(nodeIdInMip)
             ao_node = self.objects[ao]
-            if self.iteration != self.mip.node[ao_node]['revisions'][-1]:
+            if len(self.mip.node[ao_node]['revisions']) == 0 \
+                    or self.iteration != self.mip.node[ao_node]['revisions'][-1]:
                 self.mip.node[ao_node]['revisions'].append(self.iteration)  # add revision
             self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)
             changedAOs.append(ao_node)
@@ -156,6 +159,7 @@ class Mip:
     Computes degree of interest between a user and an object
     gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
     '''
+
     def DegreeOfInterestMIPs(self, user, obj):
         api_obj = self.centrality[obj]  # node centrality (apriori component)
         # compute proximity between user node and object node using Cycle-Free-Edge-Conductance from Koren et al. 2007 or Adamic/Adar
@@ -168,8 +172,6 @@ class Mip:
             changeExtent = self.changeExtent(user, obj)
 
         return self.alpha * api_obj + self.beta1 * proximity + self.gamma * changeExtent  # TODO: check that scales work out, otherwise need some normalization
-
-
 
     def adamicAdarProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
         '''
@@ -199,7 +201,6 @@ class Mip:
             edgeProximity = self.mip[s][t]['weight'] / self.mip.degree(s, weight='weight')
         return edgeWeight * edgeProximity + (1 - edgeWeight) * simpleProximity
 
-
     # ASK: What is CFEC and do we need it?
     # def CFEC(self, s, t):
     # '''
@@ -219,9 +220,7 @@ class Mip:
     #         prob *= float(self.mip[path[i]][path[i + 1]]['weight']) / self.mip.degree(path[i])
     #     return prob
 
-
-
-    #ASK: questions about this function and it's relevant's for code:
+    # ASK: questions about this function and it's relevant's for code:
     def changeExtent(self, userId, aoNode):
         '''
         computes the extent/frequency to which an object was changed since the last time the user was notified about it
@@ -238,6 +237,7 @@ class Mip:
         # this message should't print. shouldn't we return 0?
         if revs[-1] == fromRevision:
             print(f"This code last changed by the user {userId} himself!")
+            return 0
 
         # does number of chenges should be weighted by size of change???
         numOfChanges = sum(1 for i in revs if i > fromRevision)
@@ -249,11 +249,13 @@ class Mip:
     # ASK: comment from previous function. why need to call this function first?
     def rankObjects(self, user):
         if user not in self.users:
+            print(self.users)
             print("this is a new user! getting default rankings")
             return self.getDefaultRankings()
         # ASK: if we do want to add "a runing changelog", need a basic value for new joinees. plus: new changes need to cancel old ones.
 
-        tupledAos = ((ao, self.DegreeOfInterestMIPs(user, ao)) for ao in self.getLiveAos(user))
+        tupledAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao)) \
+                     for ao in self.getLiveAos(user))
         return sorted(tupledAos, key=lambda x: x[1])
 
     def rankChanged(self, user, time=None):
@@ -265,7 +267,7 @@ class Mip:
         if time is None:
             time = self.mip.node[userNode]['last_visit']
 
-        changedAos = ((ao, self.DegreeOfInterestMIPs(user, ao))
+        changedAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao))
                       for ao in self.getLiveAos(user) if self.mip[ao]['revisions'][-1] > time)
         return sorted(changedAos, key=lambda x: x[1])
 
