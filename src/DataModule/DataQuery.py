@@ -2,7 +2,6 @@ import itertools
 
 from agithub.GitHub import GitHub
 import uritemplate, requests
-from bs4 import BeautifulSoup
 
 import DataModule.models as Models
 from DataModule.utils import *
@@ -47,7 +46,7 @@ class Query:
     def _get_last_page(self):
         headers = self._g.getheaders()
         link = next(h for h in headers if "Link" in h)
-        match = re.search(r'page=(\d+)[^;]+; rel="last"', link[1])
+        match = re.search(r'[&?]page=(\d+)[^;]+;\s*rel="last"', link[1])
         return int(match.group(1))
 
     def get_user(self, useruri):
@@ -77,20 +76,9 @@ class Query:
                         example: "mozilla/DeepSpeech" or KNOWN_SMALL_REPOS[6]
         :return: number
         """
-
-        # 1. get the repo api:
-        res = self._g.repos[repouri].get()
-        assert res[0] == 200, res
-        repo = Models.Repo.create(res[1])
-
-        # 2. fetch full html page
-        req = requests.get(repo.html_url)
-        assert req.status_code == 200
-
-        # 3. parse the page and return commits num:
-        soup = BeautifulSoup(req.content, "html.parser")
-        commits = soup.find("li", "commits").find("span", "num").get_text().strip()
-        return int(commits)
+        self._g.repos[repouri].commits.get(per_page=1)
+        lastPage = self._get_last_page()
+        return lastPage
 
     def repo_iterate_commits(self, repouri, maxPage=None,
                              fetch_files_for_commit=True, withPageNum=False):
@@ -166,12 +154,15 @@ class DataExtractor:
         for page, commit in repo_iter:
             if lastpage is not None and lastpage != page:
                 storage.add_page(lastpage, commits)
+                commits = []
             lastpage = page
             commits.append(commit)
             yield commit
 
         if lastpage is not None:
             storage.add_page(lastpage, commits)
+
+        storage.dispose()
 
 
 if __name__ == "__main__":
@@ -182,8 +173,8 @@ if __name__ == "__main__":
     # print(commit)
 
     de = DataExtractor("Storage")
-    # gen = de.get_train_test_generator(KNOWN_SMALL_REPOS[1])
-    gen = de.get_train_test_generator("urielha/SimpleObjectAppender")
+    # gen = de.get_train_test_generator(KNOWN_SMALL_REPOS[0])
+    gen = de.get_train_test_generator("urielha/heapdict")
     i = itertools.count(1)
     print("train:")
     for commit in gen:
