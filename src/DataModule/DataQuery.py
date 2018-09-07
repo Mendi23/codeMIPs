@@ -176,13 +176,16 @@ if __name__ == "__main__":
     # print(commit)
 
     de = DataExtractor("Storage")
-    # gen = de.get_train_test_generator(KNOWN_SMALL_REPOS[0])
-    gen = de.get_train_test_generator("urielha/heapdict")
-    i = itertools.count(1)
-    print("train:")
-    for commit in gen:
-        print(f"1 [{next(i):02}]- {commit.sha}: {commit.message} | {commit.date}")
+    for source in [KNOWN_SMALL_REPOS[4],
+                   KNOWN_SMALL_REPOS[0],
+                   "urielha/SimpleObjectAppender",
+                   "urielha/log4stash"]:
+        gen = de.get_train_test_generator(source)
+        i = itertools.count(1)
+        print("train:")
+        for commit in gen:
+            print(f"1 [{next(i):02}]- {commit.sha}: {commit.date}")
 
-    print("test:")
-    for commit in gen:
-        print(f"2 [{next(i):02}]- {commit.sha}: {commit.message} | {commit.date}")
+        print("test:")
+        for commit in gen:
+            print(f"2 [{next(i):02}]- {commit.sha}: {commit.date}")
