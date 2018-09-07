@@ -1,4 +1,7 @@
 import json, os, re
+
+import typing
+
 import DataModule.models as Models
 
 
@@ -87,7 +90,7 @@ class Storage:
         with open(self.head_name, "w") as head:
             head.write(self.conf[self.SEC_HEAD])
 
-    def get_pages(self):
+    def get_pages(self) -> typing.Dict[int, typing.List[Models.Commit]]:
         return self.conf[self.SEC_COMMITS]
 
     def add_page(self, page, commits):
@@ -95,8 +98,9 @@ class Storage:
         page_num = int(page)
         if page_num in self.conf[key]:
             print(f"Warning: overwriting a page num: {page}")
-        data = self.conf[key][page_num] = json.dumps([page_num, commits], indent=2,
-                                                     cls=_CustomJsonEncoder)
+        self.conf[key][page_num] = commits
+
+        data = json.dumps([page_num, commits], indent=2, cls=_CustomJsonEncoder)
         self.file.write(os.linesep)
         self.file.write(data)
         self.file.flush()
