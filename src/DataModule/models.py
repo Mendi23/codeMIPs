@@ -1,6 +1,8 @@
 import base64
 import gzip
 
+import typing
+
 
 class Base:
     def __init__(self):
@@ -106,7 +108,7 @@ class Commit(CommitPartial):
     """
     def __init__(self):
         super().__init__()
-        self.files = None
+        self.files: typing.List[FileChangeset] = None
 
     def _hooks(self, json, objectLoaded):
         super()._hooks(json, objectLoaded)
