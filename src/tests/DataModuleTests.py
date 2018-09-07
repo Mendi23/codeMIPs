@@ -76,10 +76,11 @@ class StorageTests(unittest.TestCase):
         self.assertGreater(pagenum, 1)
 
     def test_add_pages(self):
-        commit = Models.Commit()
-        file = Models.FileChangeset()
-        file.patch = "hello world"
-        commit.files = [file]
+        commit = Models.CommitPatch()
+        commit.patch = "diff --git a/1 b/1\n" \
+                        "--- /dev/null\n" \
+                        "+++ b/bla.py\n" \
+                        "@@ -0,0 +1,6 @@"
 
         self.storage = storage = Storage(self.DIR, self.NON_EXISTS_REPO)
         self.assertEqual(storage.commits_len, -1)
@@ -88,14 +89,14 @@ class StorageTests(unittest.TestCase):
         pages = storage.get_pages()
         self.assertIn(1, pages)
         self.assertEqual(len(pages[1]), 1)
-        self.assertEqual(len(pages[1][0].files), 1)
+        self.assertEquals(pages[1][0].patch, commit.patch)
         storage.dispose()
 
         self.storage = storage = Storage(self.DIR, self.NON_EXISTS_REPO)
         self.assertEqual(storage.commits_len, 1)
         n, commits = storage.get_pages().popitem()
         self.assertEqual(n, 1)
-        self.assertEqual(commits[0].files[0].patch, "hello world")
+        self.assertEqual(commits[0].patch, commit.patch)
         storage.dispose()
 
 if __name__ == '__main__':

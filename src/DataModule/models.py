@@ -3,6 +3,13 @@ import gzip
 
 import typing
 
+def _encode_string(s: str) -> str:
+    compressed = gzip.compress(str(s).encode())
+    return base64.b64encode(compressed).decode()
+
+def _decode_string(s: str) -> str:
+    decoded = base64.b64decode(str(s).encode())
+    return gzip.decompress(decoded).decode()
 
 class Base:
     def __init__(self):
@@ -85,7 +92,7 @@ class CommitPartial(Base):
     def _hooks(self, json, objectLoaded):
 
         if not objectLoaded:
-            assert json["commit"] is not None
+            assert "commit" in json and json["commit"] is not None
             commit = json["commit"]
             # self.tree = Base.create(commit["tree"], objectLoaded)
             self.message = commit["message"]
@@ -102,9 +109,9 @@ class CommitPartial(Base):
 
 
 
-class Commit(CommitPartial):
+class CommitFiles(CommitPartial):
     """
-    Commit is a CommitPartial but with `files`
+    CommitFiles is a CommitPartial but with `files`
     """
     def __init__(self):
         super().__init__()
@@ -112,7 +119,29 @@ class Commit(CommitPartial):
 
     def _hooks(self, json, objectLoaded):
         super()._hooks(json, objectLoaded)
-        self.files = [FileChangeset.create(f, objectLoaded) for f in json["files"]]
+        if "files" in json and json["files"] is not None:
+            self.files = [FileChangeset.create(f, objectLoaded) for f in json["files"]]
+
+
+class CommitPatch(CommitPartial):
+    """
+    CommitPatch is a CommitPartial but with `patch` that contain files data
+    """
+    def __init__(self, commitPartial: CommitPartial = None, patch = None):
+        super().__init__()
+        if commitPartial is not None:
+            self.__dict__ = commitPartial.__dict__
+        self.patch: str = patch
+
+    def _hooks(self, json, objectLoaded):
+        if objectLoaded and "patch" in json and json["patch"] is not None:
+            self.patch = _decode_string(self.patch)
+
+    def serialize(self):
+        json = super().serialize()
+        json["patch"] = _encode_string(self.patch)
+        return json
+
 
 class FileChangeset(Base):
     def __init__(self):
@@ -129,11 +158,9 @@ class FileChangeset(Base):
 
     def _hooks(self, json, objectLoaded):
         if objectLoaded:
-            decoded = base64.b64decode(str(self.patch).encode())
-            self.patch = gzip.decompress(decoded).decode()
+            self.patch = _decode_string(self.patch)
 
     def serialize(self):
         json = super().serialize()
-        compressed = gzip.compress(str(self.patch).encode())
-        json["patch"] = base64.b64encode(compressed).decode()
+        json["patch"] = _encode_string(self.patch)
         return json

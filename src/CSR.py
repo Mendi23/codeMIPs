@@ -13,29 +13,33 @@ import unidiff
 
 import DataModule.models as Models
 
+
 class Csr:
     def __init__(self):
         self.csr = nx.Graph()
         self.mapping = hashing.MagicHash()
 
-    def apply_changes_from_commit(self, commit):
-        for file in commit.files:
-            if file.status == 'added':
-                if file.patch and len(file.patch) > 1:
-                    patch = PatchSet(file.patch)
-                    print(patch)
-                objId = self.mapping[file.filename]
-            elif file.status == 'modified':
-                objId = self.mapping[file.filename]
-            elif file.status == 'removed':
-                objId = self.mapping.pop(file.filename)
-            elif file.status == 'renamed':
-                self.mapping.rename(file.previous_filename, file.filename)
-                objId = self.mapping[file.filename]
+    def apply_changes_from_commit(self, commit: Models.CommitPatch):
+        patch = PatchSet(commit.patch)
+        file: PatchedFile = None  # for autocorrect
+        for file in patch:
+            if file.is_added_file:
+                status = "added"
+                objId = self.mapping[file.target_file]
+
+            elif file.is_modified_file:
+                status = "modified"
+                if file.source_file != file.target_file:
+                    self.mapping.rename(file.source_file, file.target_file)
+                    status = "renamed"
+                objId = self.mapping[file.target_file]
+
+            elif file.is_removed_file:
+                status = "removed"
+                objId = self.mapping.pop(file.source_file)
+
             else:
-                raise ValueError(f"Unknown file status: {file.status}")
+                raise ValueError(f"Unknown file status: {str(file)}")
 
-            yield Action(objId, file.status)
-
-
+            yield Action(objId, status)
 

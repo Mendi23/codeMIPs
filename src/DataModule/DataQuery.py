@@ -90,7 +90,7 @@ class Query:
         :param maxPage: max page to reach (actually form this page we will start)
         :param fetch_files_for_commit: fetch also the files of the commit
         :param withPageNum: yield also page number
-        :return: Commit
+        :return: Commit (Partial or Patch)
         """
 
         if maxPage is not None:
@@ -105,9 +105,12 @@ class Query:
 
             for commit in reversed([Models.CommitPartial.create(c) for c in res[1]]):
                 if fetch_files_for_commit:
-                    real_commit = self._g.repos[repouri].commits[commit.sha].get()
-                    assert real_commit[0] == 200
-                    toYield = Models.Commit.create(real_commit[1])
+                    patch_details = self._g.repos[repouri].commits[commit.sha].get(
+                        headers={"Accept": "application/vnd.github.v3.patch"}
+                    )
+                    assert patch_details[0] == 200
+                    commit2 = Models.CommitPatch(commit, patch_details[1])
+                    toYield = commit2
                 else:
                     toYield = commit
 
