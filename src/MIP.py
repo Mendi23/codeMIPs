@@ -13,7 +13,7 @@ import math
 
 
 # ASK: we ignored all "focus" based actions. if we don't have focus object, how does the functions and beta_2 changes?
-# ASK: how can we use the attributes of a projec? a long tail, dominated changer, the user'r precentege of changes, etc.
+# ASK: how can we use the attributes of a projec? a long tail, dominate changer, the user'r precentege of changes, etc.
 
 class Mip:
     """
@@ -21,7 +21,7 @@ class Mip:
     @:param decay
     """
 
-    def __init__(self, alpha=0.2, beta1=0.6, beta2=0, gamma=0.2, similarityMetric="edge", decay=0.1):
+    def __init__(self, alpha=0.2, beta1=0.6, beta2=0, gamma=0.2, similarityMetric="adamic", decay=0.1):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
@@ -40,7 +40,7 @@ class Mip:
         self.nodeIDsToObjectsIds = {}  # dictionary mapping between ids of nodes and object ids
         self.nodeIDsToUsersIds = {}  # dictionary mapping between ids of nodes and user ids
 
-        # ASK: what are the efffect of different similarityMetric?
+        # ASK: what are the effect of different similarityMetric?
         if similarityMetric == "edge":
             self.similarityMetric = self.edgeBasedProximity
         elif similarityMetric == "adamic":
@@ -56,13 +56,13 @@ class Mip:
             else self.mip.nodes()
         yield from (node for node in nodes \
                     if self.mip.node[node]['node_type'] == 'object' \
-                    and self.mip.node[node]['deleted'] == 0)
+                    and not self.mip.node[node]['deleted'])
 
     def addUser(self, user_name):
         if user_name not in self.users:
             self.lastID += 1
             self.users[user_name] = self.lastID
-            # ASK: if a new user joins, should we make "last_visit" to be cuurent iteration instead of 0?
+            # ASK: if a new user joins, should we make "last_visit" to be current iteration instead of 0?
             attr = {'node_type': 'user',
                     'last_visit': 0}
             self.mip.add_node(self.lastID, attr)
@@ -85,14 +85,14 @@ class Mip:
         self.iteration += 1
         # initialize 'updated' attribute of all edges to false
         for edge in self.mip.edges_iter(data=True):
+            # TODO: why not update decay while iterating instead of updated?
             edge[2]['updated'] = 0
 
+        # BUG: we don't need it anymore!
         self.log.append(session)  # append session to log
         user = session.user
 
-        if user not in self.users:  # add user if not exist
-            self.addUser(user)
-        user_node = self.users[user]
+        user_node = self.addUser(user)
         self.mip.node[user_node]['last_visit'] = self.iteration
         # update MIP based on all actions
         changedAOs = []
@@ -109,11 +109,12 @@ class Mip:
             changedAOs.append(ao_node)
 
             if act.actType == 'delete':  # label deleted objects as deleted
-                self.mip.node[self.objects[act.ao]]['deleted'] = 1
+                self.mip.node[self.objects[act.ao]]['deleted'] = True
 
         for node1, node2 in combinations(session.actions, 2):
             self.updateEdge(node1.ao, node2.ao, 'ao-ao', self.objectsInc)
 
+        # ASK: here should appear updates based on code structure
         if self.decay > 0:
             for edge in self.mip.edges_iter(data=True):
                 if edge[2]['updated'] == 0:
@@ -123,13 +124,9 @@ class Mip:
                     elif edge[2]['edge_type'] == 'u-ao':
                         if edge[0] == user_node or edge[1] == user_node:
                             edge[2]['weight'] = max(edge[2]['weight'] - self.decay, 0)
-        # ASK: about centrality update and to-do
-        #        self.centrality = nx.degree_centrality(self.mip)
-        # #ASK: _TODO: apriori importance for now is simply degree, consider reverting to more complex option
 
         if self.alpha > 0:
             try:
-                # ASK: What?
                 self.centrality = nx.current_flow_betweenness_centrality(self.mip, True, weight='weight')
             except nx.NetworkXError:
                 self.centrality = nx.degree_centrality(self.mip)
@@ -155,12 +152,11 @@ class Mip:
     -----------------------------------------------------------------------------
     '''
 
-    '''
-    Computes degree of interest between a user and an object
-    gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
-    '''
-
     def DegreeOfInterestMIPs(self, user, obj):
+        """
+        Computes degree of interest between a user and an object
+        gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
+        """
         api_obj = self.centrality[obj]  # node centrality (apriori component)
         # compute proximity between user node and object node using Cycle-Free-Edge-Conductance from Koren et al. 2007 or Adamic/Adar
         proximity = 0.0
@@ -174,13 +170,13 @@ class Mip:
         return self.alpha * api_obj + self.beta1 * proximity + self.gamma * changeExtent  # TODO: check that scales work out, otherwise need some normalization
 
     def adamicAdarProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
-        '''
+        """
         computes Adamic/Adar proximity between nodes, adjusted to consider edge weights
         here's adamic/adar implementation in networkx. Modifying to consider edge weights
         def predict(u, v):
             return sum(1 / math.log(G.degree(w))
                        for w in nx.common_neighbors(G, u, v))
-        '''
+        """
         proximity = 0.0
         for node in nx.common_neighbors(self.mip, s, t):
             weights = self.mip[s][node]['weight'] + self.mip[t][node]['weight']  # the weight of the path connecting s and t through the current node
@@ -201,31 +197,11 @@ class Mip:
             edgeProximity = self.mip[s][t]['weight'] / self.mip.degree(s, weight='weight')
         return edgeWeight * edgeProximity + (1 - edgeWeight) * simpleProximity
 
-    # ASK: What is CFEC and do we need it?
-    # def CFEC(self, s, t):
-    # '''
-    # computes Cycle-Free-Edge-Conductance from Koren et al. 2007
-    # for each simple path, we compute the path probability (based on weights)
-    # '''
-    #     R = nx.all_simple_paths(self.mip, s, t, cutoff=3)
-    #     proximity = 0.0
-    #     for r in R:
-    #         PathWeight = self.mip.degree(r[0]) * (self.PathProb(r))  # check whether the degree makes a difference, or is it the same for all paths??
-    #         proximity += PathWeight
-    #     return proximity
-    #
-    # def PathProb(self, path):
-    #     prob = 1.0
-    #     for i in range(len(path) - 1):
-    #         prob *= float(self.mip[path[i]][path[i + 1]]['weight']) / self.mip.degree(path[i])
-    #     return prob
-
-    # ASK: questions about this function and it's relevant's for code:
     def changeExtent(self, userId, aoNode):
-        '''
+        """
         computes the extent/frequency to which an object was changed since the last time the user was notified about it
         will be a component taken into account in degree of interest
-        '''
+        """
         fromRevision = 0  # in case user does not exist yet or has never known about this object, start from revision 0
         if userId in self.users and self.mip.has_edge(self.users[userId], aoNode):
             userNode = self.users[userId]
@@ -239,24 +215,18 @@ class Mip:
             print(f"This code last changed by the user {userId} himself!")
             return 0
 
-        # does number of chenges should be weighted by size of change???
         numOfChanges = sum(1 for i in revs if i > fromRevision)
         return numOfChanges / float((self.iteration - fromRevision))
 
-    # ASK: what the fuck with the mountains of code I had to delete??
-    # ASK: what should be the default limit?
-    # ASK: should we allow repeated requests (meaning not discarding all changes as seen after the first request)
-    # ASK: comment from previous function. why need to call this function first?
     def rankObjects(self, user):
         if user not in self.users:
             print(self.users)
             print("this is a new user! getting default rankings")
             return self.getDefaultRankings()
-        # ASK: if we do want to add "a runing changelog", need a basic value for new joinees. plus: new changes need to cancel old ones.
 
         tupledAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao)) \
                      for ao in self.getLiveAos(user))
-        return sorted(tupledAos, key=lambda x: x[1])
+        return sorted(tupledAos, key=lambda x: x[1], reverse=True)
 
     def rankChanged(self, user, time=None):
         if user not in self.users:
@@ -268,8 +238,8 @@ class Mip:
             time = self.mip.node[userNode]['last_visit']
 
         changedAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao))
-                      for ao in self.getLiveAos(user) if self.mip[ao]['revisions'][-1] > time)
-        return sorted(changedAos, key=lambda x: x[1])
+                      for ao in self.getLiveAos(user) if self.mip.node[ao]['revisions'][-1] > time)
+        return sorted(changedAos, key=lambda x: x[1], reverse=True)
 
     # TODO: Implament
     def getLastChanges(self):
@@ -279,7 +249,6 @@ class Mip:
     def getDefaultRankings(self):
         pass
 
-    # ASK: can't we use user focus at all?
 
     '''
     -----------------------------------------------------------------------------
