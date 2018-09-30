@@ -132,6 +132,7 @@ class CommitPatch(CommitPartial):
         if commitPartial is not None:
             self.__dict__ = commitPartial.__dict__
         self.patch: str = patch
+        self.diffs = None
 
     def _hooks(self, json, objectLoaded):
         if objectLoaded and "patch" in json and json["patch"] is not None:

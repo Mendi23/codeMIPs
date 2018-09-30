@@ -1,6 +1,6 @@
 import itertools
 
-from git import Repo
+from git import Repo, Commit
 import uritemplate, requests
 from urllib.parse import urljoin
 from os.path import join as pathjoin
@@ -60,11 +60,15 @@ class Query:
         ret.uri = urljoin(BASE_URL, repouri)
         ret.storage =  pathjoin(STORAGE_PATH, repouri)
         if os.path.exists(ret.storage):
+            print("load existing repo..")
             ret.repo = Repo(ret.storage)
         else:
+            print("cloning repo..")
             ret.repo = Repo.clone_from(ret.uri, ret.storage, bare=True)
 
+        print("fetch..")
         ret.repo.remotes.origin.fetch(MASTER)
+        print("ready!")
         return ret
 
     def num_of_commits(self):
@@ -80,15 +84,17 @@ class Query:
         :return: Commit (Partial or Patch)
         """
 
-        commits = reversed(list(self.repo.iter_commits()))
+        commits: typing.List[Commit] = reversed(list(self.repo.iter_commits()))
         prev_commit = next(commits)
         for commit in commits:
-            co = {}
-            co["message"] = commit.message
-            co["committer"] = commit.committer
-            co["author"] = commit.author
-            co["diff"] = prev_commit.diff(commit)
-            co["patch"] = self.repo.git.diff(prev_commit, commit)
+            co = Models.CommitPatch()
+            co.message = commit.message
+            co.committer = commit.committer
+            co.author = commit.author
+            co.sha = commit.hexsha
+            co.date = commit.committed_datetime.strftime("%x %X")
+            # co.diffs = prev_commit.diff(commit)
+            # co.patch = self.repo.git.diff(prev_commit, commit)
             yield co
             prev_commit = commit
 
@@ -98,42 +104,13 @@ class DataExtractor:
 
     def __init__(self, savedir, ratio=None):
         self.ratio = ratio if ratio is not None else 0.75
-        self._query = Query()
         self.savedir = Storage.init_save_dir(savedir)
 
     def get_train_test_generator(self, repouri):
-        storage = Storage(self.savedir, repouri)
-        if storage.commits_len < 0:
-            storage.commits_len = self._query.repo_num_of_commits(repouri)
+        query = Query.create(repouri)
 
-        return Gen(int(storage.commits_len * self.ratio),
-                   self._iter_pages(storage, repouri))
-
-    def _iter_pages(self, storage: Storage, repouri):
-        pages = storage.get_pages()
-        pages_sorted = sorted(pages.keys(), reverse=True)
-        for i in pages_sorted:
-            for commit in pages[i]:
-                yield commit
-
-        maxPage = None if len(pages) == 0 else min(pages.keys()) - 1
-        repo_iter = self._query.repo_iterate_commits(repouri,
-                                                     maxPage=maxPage,
-                                                     withPageNum=True)
-        commits = []
-        lastpage = None
-        for page, commit in repo_iter:
-            if lastpage is not None and lastpage != page:
-                storage.add_page(lastpage, commits)
-                commits = []
-            lastpage = page
-            commits.append(commit)
-            yield commit
-
-        if lastpage is not None and any(commits):
-            storage.add_page(lastpage, commits)
-
-        storage.dispose()
+        return Gen(int(query.num_of_commits() * self.ratio),
+                   query.repo_iterate_commits())
 
 
 if __name__ == "__main__":
