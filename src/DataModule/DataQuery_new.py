@@ -51,14 +51,14 @@ class Query:
         self.repo = None
 
     @classmethod
-    def create(cls, repouri):
+    def create(cls, storage, repouri):
         """
         :param repouri: repo uri name.
                         example: "mozilla/DeepSpeech" or KNOWN_SMALL_REPOS[6]
         """
         ret = cls()
         ret.uri = urljoin(BASE_URL, repouri)
-        ret.storage =  pathjoin(STORAGE_PATH, repouri)
+        ret.storage =  pathjoin(storage, repouri)
         if os.path.exists(ret.storage):
             print("load existing repo..")
             ret.repo = Repo(ret.storage)
@@ -74,29 +74,29 @@ class Query:
     def num_of_commits(self):
         return self.repo.head.commit.count()
 
-    def repo_iterate_commits(self, maxCommit=None,
-                             fetch_diffs_for_commit=True):
+    def repo_iterate_commits(self):
         """
         Yo! welcome! this is very important function!
 
-        :param maxCommit: max commit num to reach
-        :param fetch_diffs_for_commit: fetch also the files of the commit
         :return: Commit (Partial or Patch)
         """
 
-        commits: typing.List[Commit] = reversed(list(self.repo.iter_commits()))
-        prev_commit = next(commits)
+        commits: typing.List[Commit] = self.repo.iter_commits(MASTER,
+                                                              first_parent=True,
+                                                              reverse=True)
         for commit in commits:
-            co = Models.CommitPatch()
-            co.message = commit.message
-            co.committer = commit.committer
-            co.author = commit.author
-            co.sha = commit.hexsha
-            co.date = commit.committed_datetime.strftime("%x %X")
-            # co.diffs = prev_commit.diff(commit)
-            # co.patch = self.repo.git.diff(prev_commit, commit)
-            yield co
-            prev_commit = commit
+            yield commit
+
+            # co = Models.CommitPatch()
+            # co.message = commit.message
+            # co.committer = commit.committer
+            # co.author = commit.author
+            # co.sha = commit.hexsha
+            # co.date = commit.committed_datetime.strftime("%x %X")
+            # # co.stats = commit.stats
+            # co.obj = commit
+            # # co.patch = self.repo.git.show(commit)
+            # yield co
 
 
 
@@ -104,13 +104,25 @@ class DataExtractor:
 
     def __init__(self, savedir, ratio=None):
         self.ratio = ratio if ratio is not None else 0.75
-        self.savedir = Storage.init_save_dir(savedir)
+        self.gitdir = Storage.init_save_dir(savedir)
+        self.storagedir = Storage.init_save_dir(self.gitdir + "_cache")
 
     def get_train_test_generator(self, repouri):
-        query = Query.create(repouri)
+        query = Query.create(self.gitdir, repouri)
 
         return Gen(int(query.num_of_commits() * self.ratio),
                    query.repo_iterate_commits())
+
+    def _iterate_commits(self, storage: Storage, query: Query):
+        for commit in query.repo_iterate_commits():
+            yield commit
+            # TODO: get commit.stats and parse the file name:
+            # TODO: in case of rename filename will be:
+            # TODO:         common/root/{origin/path/file.txt => other/file2.txt}
+            # TODO: need to parse this
+
+            # TODO: query repo.git.show(commit) and load into PatchSet
+
 
 
 if __name__ == "__main__":
@@ -120,15 +132,17 @@ if __name__ == "__main__":
     # commit = next(g.repo_iterate_commits("urielha/SimpleObjectAppender"))
     # print(commit)
 
-    de = DataExtractor("Storage")
+    de = DataExtractor(STORAGE_PATH)
     for source in [KNOWN_SMALL_REPOS[4],
                    KNOWN_SMALL_REPOS[0],
                    "urielha/SimpleObjectAppender",
                    "urielha/log4stash"]:
         gen = de.get_train_test_generator(source)
         i = itertools.count(1)
+
         print("train:")
         for commit in gen:
+            print(commit.stats.files)
             print(f"1 [{next(i):02}]- {commit.sha}: {commit.date}")
 
         print("test:")
