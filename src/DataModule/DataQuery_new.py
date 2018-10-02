@@ -1,6 +1,6 @@
 import itertools
 
-from git import Repo, Commit
+from git import Repo, Commit, Diff
 import uritemplate, requests
 from urllib.parse import urljoin
 from os.path import join as pathjoin
@@ -101,6 +101,17 @@ class Query:
 
 
 class DataExtractor:
+    re_path_file = r"(?:[^/{}\\]+)"
+    re_path_part = f"(?:{re_path_file}\/)"
+    re_path_full = f"(?:{re_path_part}*{re_path_file})"
+
+    re_patt = f"^(?P<root>{re_path_part}*)" \
+              r"(?:\{" \
+                f"(?P<before>{re_path_full}) => (?P<after>{re_path_full})" \
+                r"\}|" \
+                f"(?P<rest>{re_path_file})" \
+              f")$"
+    re_match = re.compile(re_patt)
 
     def __init__(self, savedir, ratio=None):
         self.ratio = ratio if ratio is not None else 0.75
@@ -115,7 +126,20 @@ class DataExtractor:
 
     def _iterate_commits(self, storage: Storage, query: Query):
         for commit in query.repo_iterate_commits():
-            yield commit
+            cobj = Models.CommitNew()
+            cobj.sha = commit.hexsha
+            cobj.message = commit.message
+            cobj.date = commit.committed_datetime
+            cobj.author = commit.author
+            cobj.committer = commit.committer
+
+            diff: Diff = None
+            for diff in commit.parents[0].diff(commit).change_type:
+                cs = Models.FileChangesetNew(diff.a_path,
+                                             diff.b_path,
+                                             diff.change_type)
+                cobj.files.append(cs)
+
             # TODO: get commit.stats and parse the file name:
             # TODO: in case of rename filename will be:
             # TODO:         common/root/{origin/path/file.txt => other/file2.txt}
@@ -135,6 +159,7 @@ if __name__ == "__main__":
     de = DataExtractor(STORAGE_PATH)
     for source in [KNOWN_SMALL_REPOS[4],
                    KNOWN_SMALL_REPOS[0],
+                   KNOWN_SMALL_REPOS[3],
                    "urielha/SimpleObjectAppender",
                    "urielha/log4stash"]:
         gen = de.get_train_test_generator(source)

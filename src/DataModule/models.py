@@ -2,6 +2,8 @@ import base64
 import gzip
 
 import typing
+from enum import Enum
+
 
 def _encode_string(s: str) -> str:
     compressed = gzip.compress(str(s).encode())
@@ -165,3 +167,42 @@ class FileChangeset(Base):
         json = super().serialize()
         json["patch"] = _encode_string(self.patch)
         return json
+
+class CommitNew:
+    def __init__(self):
+        self.sha = ""
+        self.message = ""
+        self.author = None
+        self.committer = None
+        self.date = None
+        self.files = []
+
+class FileChangesetNew:
+    class ChangeEnum(Enum):
+        ADDED = 0
+        MODIFIED = 1
+        RENAMED = 2
+        DELETED = 3
+
+        @classmethod
+        def fromtype(cls, t):
+            # A = Added
+            # D = Deleted
+            # M = Modified
+            # R = Renamed
+            # T = Changed in the type
+            if t == 'A':
+                return FileChangesetNew.ChangeEnum.ADDED
+            if t == 'M':
+                return FileChangesetNew.ChangeEnum.MODIFIED
+            if t == 'D':
+                return FileChangesetNew.ChangeEnum.DELETED
+            if t == 'R':
+                return FileChangesetNew.ChangeEnum.RENAMED
+            raise NameError(f"type name {t} is not known")
+
+    def __init__(self, source, target, changetype, patch=None):
+        self.source = source
+        self.target = target
+        self.changetype = FileChangesetNew.ChangeEnum.fromtype(changetype)
+        self.patch = patch
