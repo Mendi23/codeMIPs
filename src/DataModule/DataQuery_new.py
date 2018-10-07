@@ -6,8 +6,11 @@ from urllib.parse import urljoin
 from os.path import join as pathjoin
 import os
 
+from typing import List, Dict
+
 import DataModule.models as Models
 from DataModule.utils import *
+from unidiff import PatchedFile, PatchSet
 
 PER_PAGE = 10
 
@@ -112,6 +115,7 @@ class DataExtractor:
                 f"(?P<rest>{re_path_file})" \
               f")$"
     re_match = re.compile(re_patt)
+    re_normalize = re.compile(r"^[ab]/")
 
     def __init__(self, savedir, ratio=None):
         self.ratio = ratio if ratio is not None else 0.75
@@ -122,23 +126,60 @@ class DataExtractor:
         query = Query.create(self.gitdir, repouri)
 
         return Gen(int(query.num_of_commits() * self.ratio),
-                   query.repo_iterate_commits())
+                   self._iterate_commits(None, query))
 
     def _iterate_commits(self, storage: Storage, query: Query):
         for commit in query.repo_iterate_commits():
             cobj = Models.CommitNew()
+            cobj.o = commit
             cobj.sha = commit.hexsha
             cobj.message = commit.message
             cobj.date = commit.committed_datetime
             cobj.author = commit.author
             cobj.committer = commit.committer
 
-            diff: Diff = None
-            for diff in commit.parents[0].diff(commit).change_type:
-                cs = Models.FileChangesetNew(diff.a_path,
-                                             diff.b_path,
-                                             diff.change_type)
-                cobj.files.append(cs)
+            patch = PatchSet(query.repo.git.show(commit))
+            pf: PatchedFile
+            pfiles: Dict[str, PatchedFile] = {}
+            for pf in patch:
+                source_file = self.re_normalize.sub("/", pf.source_file)
+                target_file = self.re_normalize.sub("/", pf.source_file)
+                if pf.is_added_file:
+                    source_file = target_file
+                pfiles[source_file] = pf
+
+            for fname in commit.stats.files.keys():
+                groups = self.re_match.match(fname)
+                assert groups, f"'{fname}' was not recognized by my regex"
+                r = groups["root"]
+                if groups["rest"]:
+                    source = target = r + groups["rest"]
+                    is_renamed = False
+                else:
+                    source = r + groups["before"]
+                    target = r + groups["after"]
+                    is_renamed = True
+                is_added, is_modified, is_removed = False, True, False
+                patch = ""
+                if source in pfiles:
+                    pf = pfiles[source]
+                    is_added, is_modified, is_removed = \
+                        pf.is_added_file, pf.is_modified_file, pf.is_removed_file
+                    patch = pf.patch_info
+                changetype = Models.FileChangesetNew.type_fromtuple(
+                    is_added,
+                    is_modified,
+                    is_removed,
+                    is_renamed
+                )
+                cobj.files.append(Models.FileChangesetNew(
+                    source,
+                    target,
+                    changetype,
+                    patch,
+                ))
+
+            yield cobj
 
             # TODO: get commit.stats and parse the file name:
             # TODO: in case of rename filename will be:

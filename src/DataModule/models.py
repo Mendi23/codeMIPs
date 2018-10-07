@@ -170,6 +170,7 @@ class FileChangeset(Base):
 
 class CommitNew:
     def __init__(self):
+        self.o = None
         self.sha = ""
         self.message = ""
         self.author = None
@@ -184,25 +185,37 @@ class FileChangesetNew:
         RENAMED = 2
         DELETED = 3
 
-        @classmethod
-        def fromtype(cls, t):
-            # A = Added
-            # D = Deleted
-            # M = Modified
-            # R = Renamed
-            # T = Changed in the type
-            if t == 'A':
-                return FileChangesetNew.ChangeEnum.ADDED
-            if t == 'M':
-                return FileChangesetNew.ChangeEnum.MODIFIED
-            if t == 'D':
-                return FileChangesetNew.ChangeEnum.DELETED
-            if t == 'R':
-                return FileChangesetNew.ChangeEnum.RENAMED
-            raise NameError(f"type name {t} is not known")
+    @staticmethod
+    def type_fromtype(t):
+        # A = Added
+        # D = Deleted
+        # M = Modified
+        # R = Renamed
+        # T = Changed in the type
+        if t == 'A':
+            return FileChangesetNew.ChangeEnum.ADDED
+        if t == 'M':
+            return FileChangesetNew.ChangeEnum.MODIFIED
+        if t == 'D':
+            return FileChangesetNew.ChangeEnum.DELETED
+        if t == 'R':
+            return FileChangesetNew.ChangeEnum.RENAMED
+        raise NameError(f"type name {t} is not known")
+
+    @staticmethod
+    def type_fromtuple(is_added, is_modified, is_removed, is_renamed):
+        if is_added:
+            return FileChangesetNew.ChangeEnum.ADDED
+        if is_removed:
+            return FileChangesetNew.ChangeEnum.DELETED
+        if is_renamed:
+            return FileChangesetNew.ChangeEnum.RENAMED
+        else:
+            assert is_modified
+            return FileChangesetNew.ChangeEnum.MODIFIED
 
     def __init__(self, source, target, changetype, patch=None):
         self.source = source
         self.target = target
-        self.changetype = FileChangesetNew.ChangeEnum.fromtype(changetype)
+        self.changetype = changetype
         self.patch = patch
