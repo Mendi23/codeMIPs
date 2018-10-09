@@ -1,4 +1,5 @@
 import itertools
+from pprint import pprint
 
 from git import Repo, Commit, Diff
 import uritemplate, requests
@@ -8,7 +9,7 @@ import os
 
 from typing import List, Dict
 
-import DataModule.models as Models
+import DataModule.models_new as MM
 from DataModule.utils import *
 from unidiff import PatchedFile, PatchSet
 
@@ -61,7 +62,7 @@ class Query:
         """
         ret = cls()
         ret.uri = urljoin(BASE_URL, repouri)
-        ret.storage =  pathjoin(storage, repouri)
+        ret.storage = pathjoin(storage, repouri)
         if os.path.exists(ret.storage):
             print("load existing repo..")
             ret.repo = Repo(ret.storage)
@@ -87,20 +88,7 @@ class Query:
         commits: typing.List[Commit] = self.repo.iter_commits(MASTER,
                                                               first_parent=True,
                                                               reverse=True)
-        for commit in commits:
-            yield commit
-
-            # co = Models.CommitPatch()
-            # co.message = commit.message
-            # co.committer = commit.committer
-            # co.author = commit.author
-            # co.sha = commit.hexsha
-            # co.date = commit.committed_datetime.strftime("%x %X")
-            # # co.stats = commit.stats
-            # co.obj = commit
-            # # co.patch = self.repo.git.show(commit)
-            # yield co
-
+        yield from commits
 
 
 class DataExtractor:
@@ -110,12 +98,11 @@ class DataExtractor:
 
     re_patt = f"^(?P<root>{re_path_part}*)" \
               r"(?:\{" \
-                f"(?P<before>{re_path_full}) => (?P<after>{re_path_full})" \
-                r"\}|" \
-                f"(?P<rest>{re_path_file})" \
+              f"(?P<before>{re_path_full}) => (?P<after>{re_path_full})" \
+              r"\}|" \
+              f"(?P<rest>{re_path_file})" \
               f")$"
     re_match = re.compile(re_patt)
-    re_normalize = re.compile(r"^[ab]/")
 
     def __init__(self, savedir, ratio=None):
         self.ratio = ratio if ratio is not None else 0.75
@@ -130,25 +117,14 @@ class DataExtractor:
 
     def _iterate_commits(self, storage: Storage, query: Query):
         for commit in query.repo_iterate_commits():
-            cobj = Models.CommitNew()
-            cobj.o = commit
-            cobj.sha = commit.hexsha
-            cobj.message = commit.message
-            cobj.date = commit.committed_datetime
-            cobj.author = commit.author
-            cobj.committer = commit.committer
+            cobj = self._create_commit(commit)
 
+            # ~~~~~~~~~ save the patch ~~~~~~~~~~~~~~~~
             patch = PatchSet(query.repo.git.show(commit))
-            pf: PatchedFile
-            pfiles: Dict[str, PatchedFile] = {}
-            for pf in patch:
-                # source_file = self.re_normalize.sub("/", pf.source_file)
-                # target_file = self.re_normalize.sub("/", pf.source_file)
-                #
-                # if pf.is_added_file:
-                #     source_file = target_file
-                pfiles[pf.path] = pf
+            pfiles: Dict[str, PatchedFile] = {pf.path: pf for pf in patch}
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+            # ~~~~~~~~~ convert the stats ~~~~~~~~~~~~~~~~
             for fname in commit.stats.files.keys():
                 groups = self.re_match.match(fname)
                 assert groups, f"'{fname}' was not recognized by my regex"
@@ -161,33 +137,49 @@ class DataExtractor:
                     target = r + groups["after"]
                     is_renamed = True
                 is_added, is_modified, is_removed = False, True, False
-                patch = ""
+
+                # -> fetch the patches and convert
+                patches = []
                 if source in pfiles:
                     pf = pfiles[source]
                     is_added, is_modified, is_removed = \
                         pf.is_added_file, pf.is_modified_file, pf.is_removed_file
-                    patch = pf
-                changetype = Models.FileChangesetNew.type_fromtuple(
+                    for inner in pf:
+                        patch = MM.Patch()
+                        patch.source = inner.source
+                        patch.target = inner.target
+                        patch.section_header = inner.section_header
+                        patches.append(patch)
+                # ---
+
+                changetype = MM.ChangeEnum_fromtuple(
                     is_added,
                     is_modified,
                     is_removed,
                     is_renamed
                 )
-                cobj.files.append(Models.FileChangesetNew(
-                    source,
-                    target,
-                    changetype,
-                    patch,
-                ))
+                fc = MM.FileChangeset()
+                fc.changetype = changetype
+                fc.source = source
+                fc.target = target
+                fc.patch = patch
+                cobj.files.append(fc)
 
             yield cobj
 
-            # TODO: get commit.stats and parse the file name:
-            # TODO: in case of rename filename will be:
-            # TODO:         common/root/{origin/path/file.txt => other/file2.txt}
-            # TODO: need to parse this
+    def _create_commit(self, commit) -> MM.Commit:
+        cobj = MM.Commit()
+        cobj.sha = commit.hexsha
+        cobj.message = commit.message
+        cobj.date = commit.committed_datetime
+        cobj.author = MM.User()
+        cobj.committer = MM.User()
 
-            # TODO: query repo.git.show(commit) and load into PatchSet
+        cobj.author.name = commit.author.name
+        cobj.author.email = commit.author.email
+        cobj.committer.name = commit.committer.name
+        cobj.committer.email = commit.committer.email
+        return cobj
 
 
 
@@ -209,8 +201,9 @@ if __name__ == "__main__":
 
         print("train:")
         for commit in gen:
-            print(commit.stats.files)
-            print(f"1 [{next(i):02}]- {commit.sha}: {commit.date}")
+            pprint(commit.__dict__)
+            # print(f"1 [{next(i):02}]- {commit.sha}: {commit.date}")
+            input()
 
         print("test:")
         for commit in gen:
