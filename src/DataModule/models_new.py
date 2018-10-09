@@ -133,5 +133,5 @@ class Patch(Base):
     def __init__(self):
         super().__init__()
         self.section_header = None
-        self.source = []
-        self.target = []
+        self.source_lines = []
+        self.target_lines = []

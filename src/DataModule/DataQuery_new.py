@@ -113,59 +113,78 @@ class DataExtractor:
         query = Query.create(self.gitdir, repouri)
 
         return Gen(int(query.num_of_commits() * self.ratio),
-                   self._iterate_commits(None, query))
+                   self._iterate_commits(query))
 
-    def _iterate_commits(self, storage: Storage, query: Query):
-        for commit in query.repo_iterate_commits():
+    def _iterate_commits(self, query: Query):
+        jsons_filename = pathjoin(self.storagedir, "data.{:03}.jsons")
+        fo = open(jsons_filename.format(0), "w")
+        for i, commit in enumerate(query.repo_iterate_commits()):
             cobj = self._create_commit(commit)
 
-            # ~~~~~~~~~ save the patch ~~~~~~~~~~~~~~~~
-            patch = PatchSet(query.repo.git.show(commit))
-            pfiles: Dict[str, PatchedFile] = {pf.path: pf for pf in patch}
+            # ~~~~~~~~~ save patches mapping ~~~~~~~~~~~~~~~~
+            patch_by_files = PatchSet(query.repo.git.show(commit))
+            pfiles: Dict[str, PatchedFile] = {
+                pf.path: pf for pf in patch_by_files
+            }
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             # ~~~~~~~~~ convert the stats ~~~~~~~~~~~~~~~~
             for fname in commit.stats.files.keys():
-                groups = self.re_match.match(fname)
-                assert groups, f"'{fname}' was not recognized by my regex"
-                r = groups["root"]
-                if groups["rest"]:
-                    source = target = r + groups["rest"]
-                    is_renamed = False
-                else:
-                    source = r + groups["before"]
-                    target = r + groups["after"]
-                    is_renamed = True
-                is_added, is_modified, is_removed = False, True, False
+                changetype, source, target = self._extract_metadata(fname)
 
                 # -> fetch the patches and convert
                 patches = []
                 if source in pfiles:
                     pf = pfiles[source]
-                    is_added, is_modified, is_removed = \
-                        pf.is_added_file, pf.is_modified_file, pf.is_removed_file
-                    for inner in pf:
-                        patch = MM.Patch()
-                        patch.source = inner.source
-                        patch.target = inner.target
-                        patch.section_header = inner.section_header
-                        patches.append(patch)
+                    self._fill_patches(patches, pf)
+                    if changetype != MM.ChangeEnum.RENAMED:
+                        changetype = MM.ChangeEnum_fromtuple(
+                            pf.is_added_file,
+                            pf.is_modified_file,
+                            pf.is_removed_file,
+                            False
+                        )
                 # ---
 
-                changetype = MM.ChangeEnum_fromtuple(
-                    is_added,
-                    is_modified,
-                    is_removed,
-                    is_renamed
-                )
+                # -> creating file changeset
                 fc = MM.FileChangeset()
                 fc.changetype = changetype
                 fc.source = source
                 fc.target = target
-                fc.patch = patch
+                fc.patch = patches
                 cobj.files.append(fc)
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+            Storage.export_object_to_file(cobj, fo)
+            if i>0 and i%20 == 0:
+                fo.close()
+                fo = open(jsons_filename.format(i/20), "w")
             yield cobj
+        ### END
+
+        fo.close()
+
+    def _extract_metadata(self, fname):
+        changetype = MM.ChangeEnum.MODIFIED
+        groups = self.re_match.match(fname)
+        assert groups, f"'{fname}' was not recognized by my regex"
+
+        r = groups["root"]
+        if groups["rest"]:
+            source = target = r + groups["rest"]
+        else:
+            source = r + groups["before"]
+            target = r + groups["after"]
+            changetype = MM.ChangeEnum.RENAMED
+        return changetype, source, target
+
+    def _fill_patches(self, patches, pf):
+        for inner in pf:
+            patch = MM.Patch()
+            patch.source_lines = inner.source
+            patch.target_lines = inner.target
+            patch.section_header = inner.section_header
+            patches.append(patch)
 
     def _create_commit(self, commit) -> MM.Commit:
         cobj = MM.Commit()
@@ -182,14 +201,7 @@ class DataExtractor:
         return cobj
 
 
-
 if __name__ == "__main__":
-    # g = Query()
-    # print(g.get_user("urielha"))
-    # print(g.repo_num_of_commits("urielha/SimpleObjectAppender"))
-    # commit = next(g.repo_iterate_commits("urielha/SimpleObjectAppender"))
-    # print(commit)
-
     de = DataExtractor(STORAGE_PATH)
     for source in [KNOWN_SMALL_REPOS[4],
                    KNOWN_SMALL_REPOS[0],

@@ -100,13 +100,17 @@ class Storage:
             print(f"Warning: overwriting a page num: {page}")
         self.conf[key][page_num] = commits
 
-        data = json.dumps([page_num, commits], indent=2, cls=_CustomJsonEncoder)
-        self.file.write(os.linesep)
-        self.file.write(data)
-        self.file.flush()
+        self.export_object_to_file([page_num, commits], self.file)
 
     def dispose(self):
         self.file.close()
+
+    @staticmethod
+    def export_object_to_file(obj, fo):
+        data = json.dumps(obj, indent=2, cls=_CustomJsonEncoder)
+        fo.write(os.linesep)
+        fo.write(data)
+        fo.flush()
 
 class Storage_new:
     @staticmethod
