@@ -106,59 +106,11 @@ class Storage:
         self.file.close()
 
     @staticmethod
-    def export_object_to_file(obj, fo):
-        data = json.dumps(obj, indent=2, cls=_CustomJsonEncoder)
+    def export_object_to_file(obj, fo, encoder=_CustomJsonEncoder):
+        data = json.dumps(obj, indent=2, cls=encoder)
         fo.write(os.linesep)
         fo.write(data)
         fo.flush()
-
-class Storage_new:
-    @staticmethod
-    def init_save_dir(savedir):
-        if not os.path.exists(savedir):
-            os.mkdir(savedir)
-        elif not os.path.isdir(savedir):
-            raise NotADirectoryError(f"{savedir} must be a directory")
-        return savedir
-
-    def __init__(self, savedir, repouri):
-        repouri_valid = _get_valid_filename(repouri)
-        repo_dir = os.path.join(savedir, repouri_valid)
-        if not os.path.isdir(repo_dir):
-            os.mkdir(repo_dir)
-
-        self.file_name = os.path.join(repo_dir, "data.jsons")
-        self.conf = {}
-        self.load()
-
-    def load(self):
-        exists = os.path.exists
-        if not exists(self.file_name):
-            open(self.file_name, "w").close()
-
-        self.file = open(self.file_name, "r+")
-        data = self.file.read()
-        self.conf = {
-            key: value
-            for key, value in _decode_stacked(data)
-            if any(value)
-        }
-
-    def get_pages(self) -> typing.Dict[str, object]:
-        return self.conf
-
-    def add_page(self, key, value):
-        if key in self.conf:
-            print(f"Warning: overwriting a key: {key}")
-        self.conf[key] = value
-
-        data = json.dumps([key, value], indent=2, cls=_CustomJsonEncoder)
-        self.file.write(os.linesep)
-        self.file.write(data)
-        self.file.flush()
-
-    def dispose(self):
-        self.file.close()
 
 
 class Gen:

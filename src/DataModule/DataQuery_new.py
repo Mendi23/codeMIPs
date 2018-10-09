@@ -1,3 +1,4 @@
+import datetime
 import itertools
 from pprint import pprint
 
@@ -13,7 +14,7 @@ import DataModule.models_new as MM
 from DataModule.utils import *
 from unidiff import PatchedFile, PatchSet
 
-PER_PAGE = 10
+PER_PAGE = 100
 
 ORIGIN = "origin"
 MASTER = "master"
@@ -91,6 +92,13 @@ class Query:
         yield from commits
 
 
+class _CustomJsonEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, MM.Base):
+            return o.serialize()
+        return json.JSONEncoder.default(self, o)
+
+
 class DataExtractor:
     re_path_file = r"(?:[^/{}\\]+)"
     re_path_part = f"(?:{re_path_file}\/)"
@@ -151,14 +159,16 @@ class DataExtractor:
                 fc.changetype = changetype
                 fc.source = source
                 fc.target = target
-                fc.patch = patches
+                fc.patches = patches
                 cobj.files.append(fc)
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-            Storage.export_object_to_file(cobj, fo)
-            if i>0 and i%20 == 0:
+            cobj.files.sort() # place "RENAME" before others
+
+            Storage.export_object_to_file(cobj, fo, _CustomJsonEncoder)
+            if i > 0 and i % PER_PAGE == 0:
                 fo.close()
-                fo = open(jsons_filename.format(i/20), "w")
+                fo = open(jsons_filename.format(int(i / PER_PAGE)), "w")
             yield cobj
         ### END
 
@@ -190,7 +200,7 @@ class DataExtractor:
         cobj = MM.Commit()
         cobj.sha = commit.hexsha
         cobj.message = commit.message
-        cobj.date = commit.committed_datetime
+        cobj.date_timestamp = commit.committed_datetime.timestamp()
         cobj.author = MM.User()
         cobj.committer = MM.User()
 
@@ -213,10 +223,9 @@ if __name__ == "__main__":
 
         print("train:")
         for commit in gen:
-            pprint(commit.__dict__)
-            # print(f"1 [{next(i):02}]- {commit.sha}: {commit.date}")
-            input()
+            d = datetime.datetime.fromtimestamp(commit.date_timestamp).strftime('%X-%x')
+            print(f"1 [{next(i):02}]- {commit.sha}: {d}")
 
         print("test:")
         for commit in gen:
-            print(f"2 [{next(i):02}]- {commit.sha}: {commit.date}")
+            print(f"2 [{next(i):02}]- {commit.sha}: {commit.date_timestamp}")

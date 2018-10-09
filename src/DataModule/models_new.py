@@ -73,7 +73,7 @@ class Commit(Base):
         self.message = ""
         self.author = None
         self.committer = None
-        self.date = None
+        self.date_timestamp = None
         self.files = []
 
 
@@ -90,15 +90,10 @@ def ChangeEnum_fromtype(t):
     # M = Modified
     # R = Renamed
     # T = Changed in the type
-    if t == 'A':
-        return ChangeEnum.ADDED
-    if t == 'M':
-        return ChangeEnum.MODIFIED
-    if t == 'D':
-        return ChangeEnum.DELETED
-    if t == 'R':
-        return ChangeEnum.RENAMED
-    raise NameError(f"type name {t} is not known")
+    res = next((v for k, v in ChangeEnum.__members__.items()
+                if k.startswith(t)), None)
+    if res == None:
+        raise NameError(f"type name {t} is not known")
 
 
 def ChangeEnum_fromtuple(is_added, is_modified, is_removed, is_renamed):
@@ -120,7 +115,7 @@ class FileChangeset(Base):
         self.source = ""
         self.target = ""
         self.changetype = ChangeEnum.MODIFIED
-        self.patch = None
+        self.patches = None
 
     def __eq__(self, other):
         return self.changetype == other.changetype
@@ -129,9 +124,24 @@ class FileChangeset(Base):
         return self.changetype != other.changetype and \
                self.changetype == ChangeEnum.RENAMED
 
+    def serialize(self):
+        d = super().serialize()
+        d["changetype"] = self.changetype.name
+        return d
+
+    def _hooks(self):
+        self.changetype = ChangeEnum_fromtype(self.changetype)
+
+
 class Patch(Base):
     def __init__(self):
         super().__init__()
         self.section_header = None
         self.source_lines = []
         self.target_lines = []
+
+    def serialize(self):
+        d = super().serialize()
+        d["source_lines"] = "+"
+        d["target_lines"] = "-"
+        return d
