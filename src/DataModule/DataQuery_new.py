@@ -142,11 +142,12 @@ class DataExtractor:
             pf: PatchedFile
             pfiles: Dict[str, PatchedFile] = {}
             for pf in patch:
-                source_file = self.re_normalize.sub("/", pf.source_file)
-                target_file = self.re_normalize.sub("/", pf.source_file)
-                if pf.is_added_file:
-                    source_file = target_file
-                pfiles[source_file] = pf
+                # source_file = self.re_normalize.sub("/", pf.source_file)
+                # target_file = self.re_normalize.sub("/", pf.source_file)
+                #
+                # if pf.is_added_file:
+                #     source_file = target_file
+                pfiles[pf.path] = pf
 
             for fname in commit.stats.files.keys():
                 groups = self.re_match.match(fname)
@@ -165,7 +166,7 @@ class DataExtractor:
                     pf = pfiles[source]
                     is_added, is_modified, is_removed = \
                         pf.is_added_file, pf.is_modified_file, pf.is_removed_file
-                    patch = pf.patch_info
+                    patch = pf
                 changetype = Models.FileChangesetNew.type_fromtuple(
                     is_added,
                     is_modified,
