@@ -106,10 +106,9 @@ class DataExtractor:
 
     re_patt = f"^(?P<root>{re_path_part}*)" \
               r"(?:\{" \
-              f"(?P<before>{re_path_full}) => (?P<after>{re_path_full})" \
-              r"\}|" \
-              f"(?P<rest>{re_path_file})" \
-              f")$"
+              f"(?P<before>{re_path_full})? => (?P<after>{re_path_full})?" \
+              r"\})?" \
+              f"/?(?P<rest>{re_path_file})?$"
     re_match = re.compile(re_patt)
 
     def __init__(self, savedir, ratio=None):
@@ -179,12 +178,11 @@ class DataExtractor:
         groups = self.re_match.match(fname)
         assert groups, f"'{fname}' was not recognized by my regex"
 
-        r = groups["root"]
-        if groups["rest"]:
-            source = target = r + groups["rest"]
-        else:
-            source = r + groups["before"]
-            target = r + groups["after"]
+        root = groups["root"] or ""
+        rest = groups["rest"] or ""
+        source = root + (groups["before"] or "") + rest
+        target = root + (groups["after"] or "") + rest
+        if source != target:
             changetype = MM.ChangeEnum.RENAMED
         return changetype, source, target
 
