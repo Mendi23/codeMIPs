@@ -98,15 +98,21 @@ class _CustomJsonEncoder(json.JSONEncoder):
 
 
 class DataExtractor:
-    re_path_file = r"(?:[^/{}\\]+)"
+    re_path_file = r"(?:[^/{}\\=>]+)"
     re_path_part = f"(?:{re_path_file}\/)"
     re_path_full = f"(?:{re_path_part}*{re_path_file})"
 
-    re_patt = f"^(?P<root>{re_path_part}*)" \
+    re_patt = "^(?:" \
+              f"(?P<root>{re_path_part}*)" \
               r"(?:\{" \
               f"(?P<before>{re_path_full})? => (?P<after>{re_path_full})?" \
-              r"\})?" \
-              f"\/?(?P<rest>{re_path_full})?$"
+              r"\})" \
+              f"\/?(?P<rest>{re_path_full})?" \
+              "|" \
+              f"(?P<before2>{re_path_full})? => (?P<after2>{re_path_full})?" \
+              "|" \
+              f"(?P<rest2>{re_path_full})" \
+              ")$"
     re_match = re.compile(re_patt)
 
     def __init__(self, savedir, ratio=None):
@@ -175,10 +181,17 @@ class DataExtractor:
         groups = self.re_match.match(fname)
         assert groups, f"'{fname}' was not recognized by my regex"
 
-        root = groups["root"] or ""
-        rest = groups["rest"] or ""
-        source = root + (groups["before"] or "") + rest
-        target = root + (groups["after"] or "") + rest
+        if groups["rest2"]:
+            source = target = groups["rest2"]
+        elif groups["before2"] or groups["after2"]:
+            source = groups["before2"] or ""
+            target = groups["after2"] or ""
+        else:
+            root = groups["root"] or ""
+            rest = groups["rest"] or ""
+            source = root + (groups["before"] or "") + rest
+            target = root + (groups["after"] or "") + rest
+
         if source != target:
             changetype = Models.ChangeEnum.RENAMED
         return changetype, source, target
@@ -218,7 +231,8 @@ if __name__ == "__main__":
 
         print("train:")
         for commit in gen:
-            print(f"1 [{next(i):02}]- {commit.sha}: {commit.date_str}")
+            pass
+            # print(f"1 [{next(i):02}]- {commit.sha}: {commit.date_str}")
 
         print("test:")
         for commit in gen:
