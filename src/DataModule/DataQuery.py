@@ -127,7 +127,8 @@ class DataExtractor:
             cobj = self._create_commit(commit)
 
             # ~~~~~~~~~ save patches mapping ~~~~~~~~~~~~~~~~
-            patch_by_files = PatchSet(query.repo.git.show(commit))
+            show_str = f"{commit.parents[0]}..{commit}" if commit.parents else commit
+            patch_by_files = PatchSet(query.repo.git.show(show_str))
             pfiles: Dict[str, PatchedFile] = {
                 pf.path: pf for pf in patch_by_files
             }
@@ -144,7 +145,7 @@ class DataExtractor:
                     if changetype != Models.ChangeEnum.RENAMED:
                         changetype = Models.ChangeEnum_fromdescriptor(pfiles[source])
 
-                if DEBUG_1 and len(patches) == 0:
+                if DEBUG_1 and len(patches) == 0 and changetype != Models.ChangeEnum.RENAMED:
                     print(f"{commit.hexsha}: filename: {fname}, got none patches.")
                 # ---
 
