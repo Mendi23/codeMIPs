@@ -1,16 +1,13 @@
-import datetime
 import itertools
+import uritemplate, requests
+from os.path import join as pathjoin
+from typing import Dict
+from urllib.parse import urljoin
 
 from git import Repo, Commit
-import uritemplate, requests
-from urllib.parse import urljoin
-from os.path import join as pathjoin
-
-from typing import Dict
-
+from unidiff import PatchedFile, PatchSet
 
 from DataModule.utils import *
-from unidiff import PatchedFile, PatchSet
 
 DEBUG_EXPORT = False
 DEBUG_1 = True

@@ -1,8 +1,7 @@
 import base64
 import functools
 import gzip
-
-import typing
+from datetime import datetime
 from enum import Enum
 
 
@@ -78,7 +77,7 @@ class Commit(Base):
 
     @property
     def date_str(self):
-        return self.date_timestamp.strftime("%x %X")
+        return datetime.fromtimestamp(self.date_timestamp).strftime("%x %X")
 
 
 class ChangeEnum(Enum):
@@ -101,13 +100,13 @@ def ChangeEnum_fromtype(t):
 
 
 def ChangeEnum_fromdescriptor(descriptor):
-    if descriptor.is_added:
+    if descriptor.is_added_file:
         return ChangeEnum.ADDED
-    if descriptor.is_removed:
+    if descriptor.is_removed_file:
         return ChangeEnum.DELETED
-    if descriptor.is_modified:
+    if descriptor.is_modified_file:
         return ChangeEnum.MODIFIED
-    if descriptor.is_renamed:
+    if descriptor.is_renamed_file:
         return ChangeEnum.RENAMED
 
 
