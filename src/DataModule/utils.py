@@ -31,7 +31,7 @@ def _decode_stacked(document, pos=0, decoder=json.JSONDecoder()):
 
 
 def _decode_commit_list(o):
-    return [Models.CommitPatch.create(c, True) for c in o]
+    return [Models.Commit.create(c) for c in o]
 
 
 class Storage:
@@ -90,7 +90,7 @@ class Storage:
         with open(self.head_name, "w") as head:
             head.write(self.conf[self.SEC_HEAD])
 
-    def get_pages(self) -> typing.Dict[int, typing.List[Models.CommitPatch]]:
+    def get_pages(self) -> typing.Dict[int, typing.List[Models.Commit]]:
         return self.conf[self.SEC_COMMITS]
 
     def add_page(self, page, commits):
