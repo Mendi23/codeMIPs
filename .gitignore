@@ -1,6 +1,8 @@
 *.pyc
 __pycache__
 
+*.pem 
+
 .idea
 .cache
 

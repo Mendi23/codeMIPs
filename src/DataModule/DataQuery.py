@@ -10,7 +10,7 @@ from unidiff import PatchedFile, PatchSet
 from DataModule.utils import *
 
 DEBUG_EXPORT = False
-DEBUG_1 = True
+DEBUG_1 = False
 
 PER_PAGE = 100
 
@@ -221,10 +221,10 @@ class DataExtractor:
 
 if __name__ == "__main__":
     de = DataExtractor(STORAGE_PATH)
-    for source in [KNOWN_SMALL_REPOS[0],
+    for source in ["urielha/SimpleObjectAppender",
+                   KNOWN_SMALL_REPOS[0],
                    KNOWN_SMALL_REPOS[4],
                    KNOWN_SMALL_REPOS[3],
-                   "urielha/SimpleObjectAppender",
                    "urielha/log4stash"]:
         gen = de.get_train_test_generator(source)
         i = itertools.count(1)
