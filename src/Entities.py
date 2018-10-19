@@ -9,10 +9,11 @@ Edited: Aug-Sep, 2018
 
 
 class Session:
-    def __init__(self, user, time):
+    def __init__(self, user, time, sessionWeight = 1.0):
         self.actions = []
         self.user = user
         self.time = time
+        self.sessionWeight = sessionWeight
 
     def addAction(self, action):
         self.actions.append(action)
@@ -29,10 +30,6 @@ class Action:
         self.ao = ao
         self.actType = actType  # view, edit, add, delete
         self.weightInc = weightInc
-        self.mipNodeID = -1
-
-    def updateMipNodeID(self, id):
-        self.mipNodeID = id
 
     def __str__(self):
         return f"ao = {self.ao}\nactType = {self.actType}weightInc = {self.weightInc}\nmipNodeID= {self.mipNodeID}\n"

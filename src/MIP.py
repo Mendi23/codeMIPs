@@ -11,49 +11,43 @@ from itertools import combinations
 import networkx as nx
 import math
 
-
-# ASK: we ignored all "focus" based actions. if we don't have focus object, how does the functions and beta_2 changes?
-# ASK: how can we use the attributes of a projec? a long tail, dominate changer, the user'r precentege of changes, etc.
-
+#ASK: do we really need decay as fixed value or dynamic? try without
 class Mip:
     """
-    @:param alpha, beta1, beta2, gamma
-    @:param decay
+    @:param alpha, beta, gamma
+    @:param user_decay, object_decay
     """
 
-    def __init__(self, alpha=0.2, beta1=0.6, beta2=0, gamma=0.2, similarityMetric="adamic", decay=0.1):
+    def __init__(self, alpha=0.2, beta=0.6, gamma=0.2, similarityMetric="adamic", user_decay=1.0, object_decay=1.0):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
-        self.iteration = 0
-        self.lastID = -1
-        # ASK: should the decay be dynamic and take into account both time and iterations?
-        self.decay = decay  # determines how much to decay weights when there is not interaction between two nodes over time
-        self.objectsInc = 1.0  # weight increment
-        self.centrality = None  # centrality values of all nodes
-        self.log = []  # log holds all the session data
-        # ASK: are the parameter set or need learning?
-        self.alpha = alpha  # weight given to the global importance (centrality) of the object
-        self.beta1 = beta1  # weight given to the proximity between the user and the object
-        self.beta2 = beta2  # weight given to the proximity between the focus object and the object
-        self.gamma = gamma  # weight given to the extent of change
         self.nodeIDsToObjectsIds = {}  # dictionary mapping between ids of nodes and object ids
         self.nodeIDsToUsersIds = {}  # dictionary mapping between ids of nodes and user ids
+        self.iteration = 0
+        self.lastID = -1
+        self.centrality = None  # centrality values of all nodes
 
-        # ASK: what are the effect of different similarityMetric?
+        self.alpha = alpha  # weight given to the global importance (centrality) of the object
+        self.beta = beta  # weight given to the proximity between the user and the object
+        self.gamma = gamma  # weight given to the extent of change
+        self.userDecay = user_decay
+        self.objectDecay = object_decay
+
+        # how to measure proximity/similarity in the newtork
         if similarityMetric == "edge":
             self.similarityMetric = self.edgeBasedProximity
         elif similarityMetric == "adamic":
-            self.similarityMetric = self.adamicAdarProximity  # Adamic/Adar proximity
-        elif similarityMetric == "simple":  # proximity = self.CFEC(userNodeID,obj) #cfec proximity
+            self.similarityMetric = self.adamicAdarProximity
+        elif similarityMetric == "simple":
             self.similarityMetric = self.simpleProximity
         else:
             raise ValueError('Didn\'t defined a valid similarity metric')
-        # how to measure proximity/similarity in the newtork
 
+    # ASK: what's up with deleted?
     def getLiveAos(self, user=None):  # generator of mip nodes that represent live object
-        nodes = nx.descendants(self.mip, self.users[user]) if user is not None \
-            else self.mip.nodes()
+        nodes = self.mip.neighbors(self.users[user]) if user is not None \
+            else self.mip.nodes_iter()
         yield from (node for node in nodes \
                     if self.mip.node[node]['node_type'] == 'object' \
                     and not self.mip.node[node]['deleted'])
@@ -62,7 +56,6 @@ class Mip:
         if user_name not in self.users:
             self.lastID += 1
             self.users[user_name] = self.lastID
-            # ASK: if a new user joins, should we make "last_visit" to be current iteration instead of 0?
             attr = {'node_type': 'user',
                     'last_visit': 0}
             self.mip.add_node(self.lastID, attr)
@@ -81,20 +74,33 @@ class Mip:
             self.nodeIDsToObjectsIds[self.lastID] = object_id
         return self.objects[object_id]
 
+    def getObjectId(self, id):
+        return self.objects[id]
+
     def updateMIP(self, session):
         self.iteration += 1
-        # initialize 'updated' attribute of all edges to false
-        for edge in self.mip.edges_iter(data=True):
-            # TODO: why not update decay while iterating instead of updated?
-            edge[2]['updated'] = 0
-
-        # BUG: we don't need it anymore!
-        self.log.append(session)  # append session to log
         user = session.user
-
         user_node = self.addUser(user)
         self.mip.node[user_node]['last_visit'] = self.iteration
-        # update MIP based on all actions
+
+        changedAOs = list()
+        for act in session.actions:
+            ao_node = self.addObject(act.ao)
+            changedAOs.append(ao_node)
+            if ao_node not in changedAOs: # no need to check if we assume only one action per object
+                self.mip.node[ao_node]['revisions'].append(self.iteration)  # add revision
+            self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc+self.userDecay)
+
+        for ao in self.getLiveAos(user):
+            after_decay = self.mip[user_node][ao]['weight'] - self.userDecay
+            self.mip[user_node][ao]['weight'] = max(0, after_decay)
+
+        for edge in self.mip.edges_iter(changedAOs):
+
+        for node1, node2 in combinations(changedAOs, 2):
+            self.updateEdge(node1, node2, 'ao-ao', 1.0)
+
+
         changedAOs = []
         for act in session.actions:
             ao = act.ao
@@ -112,7 +118,7 @@ class Mip:
                 self.mip.node[self.objects[act.ao]]['deleted'] = True
 
         for node1, node2 in combinations(session.actions, 2):
-            self.updateEdge(node1.ao, node2.ao, 'ao-ao', self.objectsInc)
+            self.updateEdge(node1.ao, node2.ao, 'ao-ao', 1.0)
 
         # ASK: here should appear updates based on code structure
         if self.decay > 0:
@@ -143,8 +149,6 @@ class Mip:
                     'lastKnown': self.iteration,
                     }
             self.mip.add_edge(i1, i2, attr)
-        if increment > 0:
-            self.mip[i1][i2]['updated'] = 1
 
     '''
     -----------------------------------------------------------------------------
@@ -248,7 +252,6 @@ class Mip:
     # TODO: Implament
     def getDefaultRankings(self):
         pass
-
 
     '''
     -----------------------------------------------------------------------------
