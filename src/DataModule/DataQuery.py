@@ -253,7 +253,8 @@ if __name__ == "__main__":
         #     print(f"{i:03}: {commit.hexsha}")
         #     print(f"2 [{next(i):02}]- {commit.sha}: {commit.date_str}")
 
-        print("load:")
-        commits = list(de.load_commits())
-        print(commits[0])
-        print(len(commits))
+        if DEBUG_EXPORT:
+            print("load:")
+            commits = list(de.load_commits())
+            print(len(commits))
+            print(commits[0])

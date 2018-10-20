@@ -1,6 +1,7 @@
 import base64
 import functools
 import gzip
+import json
 from datetime import datetime
 from enum import Enum
 
@@ -145,6 +146,13 @@ class Patch(Base):
 
     def serialize(self):
         d = super().serialize()
-        d["source_lines"] = "+"
-        d["target_lines"] = "-"
+        # d["source_lines"] = []
+        # d["target_lines"] = []
+        d["source_lines"] = _encode_string(json.dumps(self.source_lines))
+        d["target_lines"] = _encode_string(json.dumps(self.target_lines))
         return d
+
+    def _hooks(self):
+        # return
+        self.source_lines = json.loads(_decode_string(self.source_lines))
+        self.target_lines = json.loads(_decode_string(self.target_lines))
