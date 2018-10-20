@@ -9,6 +9,8 @@ from unidiff import PatchedFile, PatchSet
 
 from DataModule.utils import *
 
+from pyutils.file_paths import STORAGE_DIR
+
 DEBUG_EXPORT = False
 DEBUG_1 = False
 
@@ -16,10 +18,11 @@ PER_PAGE = 100
 
 ORIGIN = "origin"
 MASTER = "master"
-STORAGE_PATH = "../../Storage"
 BASE_URL = "https://github.com"
 
 KNOWN_SMALL_REPOS = [
+    "urielha/SimpleObjectAppender",
+    "urielha/log4stash",
     "Microsoft/DirectXShaderCompiler",
     "fragglet/c-algorithms",
     "TheAlgorithms/C-Plus-Plus",
@@ -233,12 +236,8 @@ class DataExtractor:
 
 
 if __name__ == "__main__":
-    de = DataExtractor(STORAGE_PATH)
-    for source in ["urielha/SimpleObjectAppender",
-                   KNOWN_SMALL_REPOS[0],
-                   KNOWN_SMALL_REPOS[4],
-                   KNOWN_SMALL_REPOS[3],
-                   "urielha/log4stash"]:
+    de = DataExtractor(STORAGE_DIR)
+    for source in KNOWN_SMALL_REPOS:
         gen = de.get_train_test_generator(source)
         i = itertools.count(1)
 

@@ -6,7 +6,7 @@ Created on Aug 17, 2018
 import json
 
 import networkx as nx
-from utils import hashing
+from pyutils import hashing
 from Entities import Action
 from unidiff import PatchedFile, PatchSet
 import unidiff
