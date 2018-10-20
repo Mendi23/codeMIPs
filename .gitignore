@@ -6,4 +6,5 @@ __pycache__
 .idea
 .cache
 
-src/DataModule/Storage/
+Storage/
+Storage_cache/

@@ -1,5 +1,5 @@
 import itertools
-import uritemplate, requests
+# import uritemplate, requests
 from os.path import join as pathjoin
 from typing import Dict
 from urllib.parse import urljoin
@@ -16,7 +16,7 @@ PER_PAGE = 100
 
 ORIGIN = "origin"
 MASTER = "master"
-STORAGE_PATH = "Storage"
+STORAGE_PATH = "../../Storage"
 BASE_URL = "https://github.com"
 
 KNOWN_SMALL_REPOS = [
@@ -43,7 +43,7 @@ KNOWN_BIG_REPOS = [
 ]
 
 
-class Query:
+class GithubQuery:
     """
     This is your dragon handle to the mighty github!!!!
     Oh poor user, you are about to see the full power of github on your tiny
@@ -52,10 +52,15 @@ class Query:
 
     def __init__(self):
         self.repo = None
+        self.uri = None
+        self.storage = None
 
     @classmethod
     def create(cls, storage, repouri):
         """
+        Create instance of GithubQuery.
+        Cloning the repository to local storage if needed.
+        Fetch last version of the repository.
         :param repouri: repo uri name.
                         example: "mozilla/DeepSpeech" or KNOWN_SMALL_REPOS[6]
         """
@@ -75,26 +80,17 @@ class Query:
         return ret
 
     def num_of_commits(self):
-        return self.repo.head.commit.count()
+        return self.repo.branches.master.commit.count(first_parent=True)
 
-    def repo_iterate_commits(self):
+    def repo_iterate_commits(self) -> typing.Iterator[Commit]:
         """
-        Yo! welcome! this is very important function!
-
-        :return: Commit (Partial or Patch)
+        Iterate over commits in "master" from the first (oldest) commit
+        to the last.
+        Excluding forks to other branches.
         """
-
-        commits: typing.List[Commit] = self.repo.iter_commits(MASTER,
-                                                              first_parent=True,
-                                                              reverse=True)
-        yield from commits
-
-
-class _CustomJsonEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, Models.Base):
-            return o.serialize()
-        return json.JSONEncoder.default(self, o)
+        return self.repo.iter_commits(MASTER,
+                                      first_parent=True,
+                                      reverse=True)
 
 
 class DataExtractor:
@@ -121,14 +117,27 @@ class DataExtractor:
         self.storagedir = Storage.init_save_dir(self.gitdir + "_cache")
 
     def get_train_test_generator(self, repouri):
-        query = Query.create(self.gitdir, repouri)
+        self.query = query = GithubQuery.create(self.gitdir, repouri)
+        self.jsons_filename = pathjoin(self.storagedir,
+                                       "data." +
+                                       Storage.get_valid_filename(repouri) +
+                                       ".{:03}.jsons"
+                                       )
 
         return Gen(int(query.num_of_commits() * self.ratio),
-                   self._iterate_commits(query))
+                   # enumerate(query.repo_iterate_commits())
+                   self._iterate_commits(query)
+                   )
 
-    def _iterate_commits(self, query: Query):
-        jsons_filename = pathjoin(self.storagedir, "data.{:03}.jsons")
-        fo = open(jsons_filename.format(0), "w")
+    def load_commits(self):
+        for i in itertools.count():
+            fname = self.jsons_filename.format(i)
+            if not os.path.exists(fname): return
+            with open(fname, "r") as fo:
+                yield from Storage.import_objects_from_file(fo, Models.Commit.create)
+
+    def _iterate_commits(self, query: GithubQuery):
+        fo = open(self.jsons_filename.format(0), "w")
         for i, commit in enumerate(query.repo_iterate_commits()):
             cobj = self._create_commit(commit)
 
@@ -142,39 +151,57 @@ class DataExtractor:
 
             # ~~~~~~~~~ convert the stats ~~~~~~~~~~~~~~~~
             for fname in commit.stats.files.keys():
-                changetype, source, target = self._extract_metadata(fname)
-
-                # -> fetch the patches and convert
-                patches = []
-                if source in pfiles:
-                    self._fill_patches(patches, pfiles[source])
-                    if changetype != Models.ChangeEnum.RENAMED:
-                        changetype = Models.ChangeEnum_fromdescriptor(pfiles[source])
-
-                if DEBUG_1 and len(patches) == 0 and changetype != Models.ChangeEnum.RENAMED:
-                    print(f"{commit.hexsha}: filename: {fname}, got none patches.")
-                # ---
-
-                # -> creating file changeset
-                fc = Models.FileChangeset()
-                fc.changetype = changetype
-                fc.source = source
-                fc.target = target
-                fc.patches = patches
+                fc = self._create_file_changeset(fname, pfiles, commit.hexsha)
                 cobj.files.append(fc)
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-            cobj.files.sort() # place "RENAME" before others
+            cobj.files.sort()  # place "RENAME" before others
 
             if DEBUG_EXPORT:
-                Storage.export_object_to_file(cobj, fo, _CustomJsonEncoder)
+                Storage.export_object_to_file(cobj, fo)
                 if i > 0 and i % PER_PAGE == 0:
                     fo.close()
-                    fo = open(jsons_filename.format(int(i / PER_PAGE)), "w")
+                    fo = open(self.jsons_filename.format(int(i / PER_PAGE)), "w")
             yield cobj
         ### END
 
         fo.close()
+
+    def _create_commit(self, commit) -> Models.Commit:
+        cobj = Models.Commit()
+        cobj.sha = commit.hexsha
+        cobj.message = commit.message
+        cobj.date_timestamp = commit.committed_datetime.timestamp()
+        cobj.author = Models.User()
+        cobj.committer = Models.User()
+
+        cobj.author.name = commit.author.name
+        cobj.author.email = commit.author.email
+        cobj.committer.name = commit.committer.name
+        cobj.committer.email = commit.committer.email
+        return cobj
+
+    def _create_file_changeset(self, fname, pfiles, commit_sha):
+        changetype, source, target = self._extract_metadata(fname)
+
+        # -> fetch the patches and convert
+        patches = []
+        if source in pfiles:
+            self._fill_patches(patches, pfiles[source])
+            if changetype != Models.ChangeEnum.RENAMED:
+                changetype = Models.ChangeEnum_fromdescriptor(pfiles[source])
+
+        if DEBUG_1 and len(patches) == 0 and changetype != Models.ChangeEnum.RENAMED:
+            print(f"{commit_sha}: filename: {fname}, got none patches.")
+        # ---
+
+        # -> creating file changeset
+        fc = Models.FileChangeset()
+        fc.changetype = changetype
+        fc.source = source
+        fc.target = target
+        fc.patches = patches
+        return fc
 
     def _extract_metadata(self, fname):
         changetype = Models.ChangeEnum.MODIFIED
@@ -204,20 +231,6 @@ class DataExtractor:
             patch.section_header = inner.section_header
             patches.append(patch)
 
-    def _create_commit(self, commit) -> Models.Commit:
-        cobj = Models.Commit()
-        cobj.sha = commit.hexsha
-        cobj.message = commit.message
-        cobj.date_timestamp = commit.committed_datetime.timestamp()
-        cobj.author = Models.User()
-        cobj.committer = Models.User()
-
-        cobj.author.name = commit.author.name
-        cobj.author.email = commit.author.email
-        cobj.committer.name = commit.committer.name
-        cobj.committer.email = commit.committer.email
-        return cobj
-
 
 if __name__ == "__main__":
     de = DataExtractor(STORAGE_PATH)
@@ -229,11 +242,18 @@ if __name__ == "__main__":
         gen = de.get_train_test_generator(source)
         i = itertools.count(1)
 
-        print("train:")
-        for commit in gen:
-            pass
-            # print(f"1 [{next(i):02}]- {commit.sha}: {commit.date_str}")
+        print(de.query.num_of_commits())
+        print("train: " + str(len(list(gen))))
+        # for i, commit in gen:
+        #     print(f"{i:03}: {commit.hexsha}")
+        #     print(f"1 [{next(i):02}]- {commit.sha}: {commit.date_str}")
 
-        print("test:")
-        for commit in gen:
-            print(f"2 [{next(i):02}]- {commit.sha}: {commit.date_str}")
+        print("test: " + str(len(list(gen))))
+        # for i, commit in gen:
+        #     print(f"{i:03}: {commit.hexsha}")
+        #     print(f"2 [{next(i):02}]- {commit.sha}: {commit.date_str}")
+
+        print("load:")
+        commits = list(de.load_commits())
+        print(commits[0])
+        print(len(commits))

@@ -97,6 +97,7 @@ def ChangeEnum_fromtype(t):
                 if k.startswith(t)), None)
     if res == None:
         raise NameError(f"type name {t} is not known")
+    return res
 
 
 def ChangeEnum_fromdescriptor(descriptor):
