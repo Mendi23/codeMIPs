@@ -145,6 +145,8 @@ class DataExtractor:
             cobj = self._create_commit(commit)
 
             # ~~~~~~~~~ save patches mapping ~~~~~~~~~~~~~~~~
+            # `git show` doesn't show merges details so here we had to
+            # give it a 2-commits diff to show (unless it is the first commit)
             show_str = f"{commit.parents[0]}..{commit}" if commit.parents else commit
             patch_by_files = PatchSet(query.repo.git.show(show_str))
             pfiles: Dict[str, PatchedFile] = {
