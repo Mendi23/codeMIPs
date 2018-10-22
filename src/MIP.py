@@ -7,18 +7,18 @@ Edited: Aug-Sep, 2018
 @editors: Uriel, Mendi
 '''
 from itertools import combinations
-
+from sortedcontainers import SortedList
 import networkx as nx
 import math
 
-#ASK: do we really need decay as fixed value or dynamic? try without
+
 class Mip:
     """
     @:param alpha, beta, gamma
     @:param user_decay, object_decay
     """
 
-    def __init__(self, alpha=0.2, beta=0.6, gamma=0.2, similarityMetric="adamic", user_decay=1.0, object_decay=1.0):
+    def __init__(self, alpha=0.2, beta=0.5, gamma=0.2, delta = 0.1, similarityMetric="adamic", user_decay=1.0, object_decay=1.0):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
@@ -26,13 +26,19 @@ class Mip:
         self.nodeIDsToUsersIds = {}  # dictionary mapping between ids of nodes and user ids
         self.iteration = 0
         self.lastID = -1
-        self.centrality = None  # centrality values of all nodes
+        # ASK: I canceled centrality as a constant, we'll calculate it every time we need a prediction
+        # ASK: same for time-based decay
+        # ASK: both can be moved to be upadted with each session
+        # ASK: what if we want real apriuti info? for example, the head node that need to be on top every time - move to CSR
 
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
         self.beta = beta  # weight given to the proximity between the user and the object
         self.gamma = gamma  # weight given to the extent of change
+        self.delta = delta # weight given to the time since last time user changed the object
         self.userDecay = user_decay
         self.objectDecay = object_decay
+
+        self.centrality = None
 
         # how to measure proximity/similarity in the newtork
         if similarityMetric == "edge":
@@ -42,22 +48,20 @@ class Mip:
         elif similarityMetric == "simple":
             self.similarityMetric = self.simpleProximity
         else:
-            raise ValueError('Didn\'t defined a valid similarity metric')
+            raise ValueError('Didn\'t define a valid similarity metric')
 
-    # ASK: what's up with deleted?
-    def getLiveAos(self, user=None):  # generator of mip nodes that represent live object
-        nodes = self.mip.neighbors(self.users[user]) if user is not None \
-            else self.mip.nodes_iter()
-        yield from (node for node in nodes \
-                    if self.mip.node[node]['node_type'] == 'object' \
-                    and not self.mip.node[node]['deleted'])
+    def getLiveAos(self, user=None, data=False):  # generator of mip nodes that represent live object
+        nodes = filter(lambda x: (x[1], x[2]), self.mip.edges_iter(self.users[user])) \
+            if user is not None else self.mip.nodes_iter(data=True)
+        objects = filter(lambda node, att: att['node_type'] == 'object' and not att['deleted'], nodes)
+        yield from objects if data else (node for node, _ in objects)
 
     def addUser(self, user_name):
         if user_name not in self.users:
             self.lastID += 1
             self.users[user_name] = self.lastID
             attr = {'node_type': 'user',
-                    'last_visit': 0}
+                    'last_visit': -1}
             self.mip.add_node(self.lastID, attr)
             self.nodeIDsToUsersIds[self.lastID] = user_name
         return self.users[user_name]
@@ -68,7 +72,7 @@ class Mip:
             self.objects[object_id] = self.lastID
             attr = {'node_type': 'object',
                     'deleted': False,
-                    'revisions': []
+                    'revisions': SortedList()
                     }
             self.mip.add_node(self.lastID, attr)
             self.nodeIDsToObjectsIds[self.lastID] = object_id
@@ -81,63 +85,35 @@ class Mip:
         self.iteration += 1
         user = session.user
         user_node = self.addUser(user)
-        self.mip.node[user_node]['last_visit'] = self.iteration
+        user_att = self.mip.node[user_node]
+        user_att['last_visit'] = self.iteration
 
         changedAOs = list()
         for act in session.actions:
             ao_node = self.addObject(act.ao)
-            changedAOs.append(ao_node)
-            if ao_node not in changedAOs: # no need to check if we assume only one action per object
-                self.mip.node[ao_node]['revisions'].append(self.iteration)  # add revision
-            self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc+self.userDecay)
-
-        for ao in self.getLiveAos(user):
-            after_decay = self.mip[user_node][ao]['weight'] - self.userDecay
-            self.mip[user_node][ao]['weight'] = max(0, after_decay)
-
-        for edge in self.mip.edges_iter(changedAOs):
-
-        for node1, node2 in combinations(changedAOs, 2):
-            self.updateEdge(node1, node2, 'ao-ao', 1.0)
-
-
-        changedAOs = []
-        for act in session.actions:
-            ao = act.ao
-            if ao not in self.objects:
-                nodeIdInMip = self.addObject(ao)
-                act.updateMipNodeID(nodeIdInMip)
-            ao_node = self.objects[ao]
-            if len(self.mip.node[ao_node]['revisions']) == 0 \
-                    or self.iteration != self.mip.node[ao_node]['revisions'][-1]:
-                self.mip.node[ao_node]['revisions'].append(self.iteration)  # add revision
-            self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)
-            changedAOs.append(ao_node)
-
+            ao_att = self.mip.node[ao_node]
+            # ASK: why do we need deleted and what to do if actualy deleted?
+            # ASK: plus, right now is considering deleted for determening interest etc. can we use it?
             if act.actType == 'delete':  # label deleted objects as deleted
-                self.mip.node[self.objects[act.ao]]['deleted'] = True
+                ao_att['deleted'] = True
 
-        for node1, node2 in combinations(session.actions, 2):
-            self.updateEdge(node1.ao, node2.ao, 'ao-ao', 1.0)
+            if ao_att['revisions'][-1] != self.iteration:  # no need to check if we assume only one action per object
+                ao_att['revisions'].append(self.iteration)  # add revision
+                changedAOs.append(ao_node)
+            self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc + self.userDecay)
 
-        # ASK: here should appear updates based on code structure
-        if self.decay > 0:
-            for edge in self.mip.edges_iter(data=True):
-                if edge[2]['updated'] == 0:
-                    if edge[2]['edge_type'] == 'ao-ao':
-                        if edge[0] in changedAOs or edge[1] in changedAOs:
-                            edge[2]['weight'] = max(edge[2]['weight'] - self.decay, 0)
-                    elif edge[2]['edge_type'] == 'u-ao':
-                        if edge[0] == user_node or edge[1] == user_node:
-                            edge[2]['weight'] = max(edge[2]['weight'] - self.decay, 0)
+        for _, att in self.getLiveAos(user, data=True):
+            att['weight'] = max(0, att['weight'] - self.userDecay)
 
-        if self.alpha > 0:
-            try:
-                self.centrality = nx.current_flow_betweenness_centrality(self.mip, True, weight='weight')
-            except nx.NetworkXError:
-                self.centrality = nx.degree_centrality(self.mip)
-        else:
-            self.centrality = nx.degree_centrality(self.mip)
+        # ASK: why do we need both increment between objects and decay for all others?
+        # ASK why is the increment set to 1 and the decay vary?
+        # ASK should the increment be by act.weightInc?
+        for node1, node2 in combinations(changedAOs, 2):
+            self.updateEdge(node1, node2, 'ao-ao', 1.0 + self.objectDecay)
+
+        for _, _, att in self.mip.edges_iter(changedAOs, data=True):
+            if att['edge_type'] == 'ao-ao':
+                att['weight'] = max(0, att['weight'] - self.objectDecay)
 
     def updateEdge(self, i1, i2, edge_type, increment=1.0):
         if self.mip.has_edge(i1, i2):
@@ -156,6 +132,12 @@ class Mip:
     -----------------------------------------------------------------------------
     '''
 
+    #ASK: Should time be a decay factor? right now added as parameter
+    #ASK: using time from lastvisit, maybe should choode dofferent refrence point?
+
+    def compute_centrailty(self):
+        self.centrality = nx.current_flow_betweenness_centrality(self.mip, weight='weight')
+
     def DegreeOfInterestMIPs(self, user, obj):
         """
         Computes degree of interest between a user and an object
@@ -164,14 +146,15 @@ class Mip:
         api_obj = self.centrality[obj]  # node centrality (apriori component)
         # compute proximity between user node and object node using Cycle-Free-Edge-Conductance from Koren et al. 2007 or Adamic/Adar
         proximity = 0.0
-        if user in self.users and self.beta1 > 0:  # no point to compute proximity if beta1 is 0... (no weight)
+        if user in self.users and self.beta > 0:  # no point to compute proximity if beta1 is 0... (no weight)
             proximity = self.similarityMetric(self.users[user], obj)
 
         changeExtent = 0.0  # need to consider how frequently the object has been changed since user last known about it: user is userId (might not be in MIP), obj is object Node id
         if self.gamma > 0:
             changeExtent = self.changeExtent(user, obj)
 
-        return self.alpha * api_obj + self.beta1 * proximity + self.gamma * changeExtent  # TODO: check that scales work out, otherwise need some normalization
+        return self.alpha * api_obj + self.beta * proximity + self.gamma * changeExtent
+        # ASK: check that scales work out, otherwise need some normalization
 
     def adamicAdarProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
         """
@@ -201,6 +184,8 @@ class Mip:
             edgeProximity = self.mip[s][t]['weight'] / self.mip.degree(s, weight='weight')
         return edgeWeight * edgeProximity + (1 - edgeWeight) * simpleProximity
 
+    #ASK: how does changeExtend changes when lastvisit and lastknown are the same?
+    #ASK: should time be a factor?
     def changeExtent(self, userId, aoNode):
         """
         computes the extent/frequency to which an object was changed since the last time the user was notified about it
@@ -211,16 +196,14 @@ class Mip:
             userNode = self.users[userId]
             if self.mip.has_edge(userNode, aoNode):
                 fromRevision = self.mip[userNode][aoNode]['lastKnown']  # get the last time the user knew what the value of the object was
-        # ASK: this all function seems to be wrong. lastKnown is noe last_visit and the calcaluations need adjusting
         revs = self.mip.node[aoNode]['revisions']
 
-        # this message should't print. shouldn't we return 0?
         if revs[-1] == fromRevision:
             print(f"This code last changed by the user {userId} himself!")
             return 0
 
-        numOfChanges = sum(1 for i in revs if i > fromRevision)
-        return numOfChanges / float((self.iteration - fromRevision))
+        numOfChanges = len(revs)-1-revs.index(fromRevision)
+        return numOfChanges / float(self.iteration - fromRevision)
 
     def rankObjects(self, user):
         if user not in self.users:
@@ -260,7 +243,7 @@ class Mip:
     '''
 
     def __str__(self):
-        return f"MIP_{self.alpha}_{self.beta1}_{self.beta2}_{self.gamma}_{self.decay}_{self.similarityMetric}"
+        return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}_{self.similarityMetric}"
 
     def createNodeLabels(self, nodeTypes='both'):
         labels = {}
