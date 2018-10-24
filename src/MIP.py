@@ -131,10 +131,7 @@ class Mip:
     -----------------------------------------------------------------------------
     '''
 
-    # ASK: Should time be a decay factor? right now added as parameter
-    # ASK: using time from lastvisit, maybe should choode dofferent refrence point?
-    # ASK: possible more features: time from last change, creation, etc.
-
+    #TODO: this funcion shoukd be called every time you try and make a pridiction
     def compute_centrailty(self):
         self.centrality = nx.current_flow_betweenness_centrality(self.mip, weight='weight')
 
@@ -219,7 +216,7 @@ class Mip:
 
     def rankChanged(self, user, time=None):
         if user not in self.users:
-            print("this is a new user! getting last changes")
+            print("this is a new user! getting default ranking")
             user = None
         else:
             userNode = self.users[user]

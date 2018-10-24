@@ -2,10 +2,11 @@ from DataModule.DataQuery import DataExtractor
 from MIP import Mip
 from Entities import Session
 from CSR import Csr
+from pyutils.file_paths import STORAGE_DIR
 
 
 def main(repo_path):
-    git = DataExtractor("..\\DataModule\\Storage")
+    git = DataExtractor(STORAGE_DIR)
     graph = Mip()
     codeGraph = Csr()
 
