@@ -1,5 +1,10 @@
 *.pyc
 __pycache__
 
+*.pem 
+
 .idea
 .cache
+
+Storage/
+Storage_cache/

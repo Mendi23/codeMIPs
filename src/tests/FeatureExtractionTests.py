@@ -1,3 +1,8 @@
+"""
+Created on Sep 7, 2018
+
+@authors: Uriel, Mendi
+"""
 import json
 import unittest
 
