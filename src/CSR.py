@@ -20,24 +20,25 @@ class Csr:
         self.mapping = hashing.MagicHash()
         self.PatchSet = patchSetAction
 
-    def apply_changes_from_commit(self, commit: Models.CommitPatch):
-        patch = self.PatchSet(commit.patch)
-        file: PatchedFile = None  # for autocorrect
-        for file in patch:
-            if file.is_added_file:
+    def apply_changes_from_commit(self, commit: Models.Commit):
+        file: Models.FileChangeset = None  # for autocorrect
+        for file in commit.files:
+            if file.changetype == Models.ChangeEnum.ADDED:
                 status = "added"
-                objId = self.mapping[file.target_file]
+                objId = self.mapping[file.target]
 
-            elif file.is_modified_file:
+            elif file.changetype == Models.ChangeEnum.MODIFIED:
                 status = "modified"
-                if file.source_file != file.target_file:
-                    self.mapping.rename(file.source_file, file.target_file)
-                    status = "renamed"
-                objId = self.mapping[file.target_file]
+                objId = self.mapping[file.target]
 
-            elif file.is_removed_file:
+            elif file.changetype == Models.ChangeEnum.RENAMED:
+                self.mapping.rename(file.source, file.target)
+                status = "renamed"
+                objId = self.mapping[file.target]
+
+            elif file.changetype == Models.ChangeEnum.RENAMED:
                 status = "removed"
-                objId = self.mapping.pop(file.source_file)
+                objId = self.mapping.pop(file.source)
 
             else:
                 raise ValueError(f"Unknown file status: {str(file)}")

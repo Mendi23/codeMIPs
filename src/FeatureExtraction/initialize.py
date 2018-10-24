@@ -10,7 +10,7 @@ def main(repo_path):
     codeGraph = Csr()
 
     for commit in git.get_train_test_generator(repo_path):
-        session = Session(commit.committer.name, commit.date)
+        session = Session(commit.author.name, commit.date_str)
         for a in codeGraph.apply_changes_from_commit(commit):
             session.addAction(a)
         graph.updateMIP(session)
