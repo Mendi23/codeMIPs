@@ -18,7 +18,7 @@ class Mip:
     @:param user_decay, object_decay
     """
 
-    def __init__(self, alpha=0.2, beta=0.5, gamma=0.2, delta = 0.1, similarityMetric="adamic", user_decay=1.0, object_decay=1.0):
+    def __init__(self, alpha=0.2, beta=0.6, gamma=0.2, similarityMetric="adamic", user_decay=1.0, object_decay=1.0):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
@@ -34,7 +34,6 @@ class Mip:
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
         self.beta = beta  # weight given to the proximity between the user and the object
         self.gamma = gamma  # weight given to the extent of change
-        self.delta = delta # weight given to the time since last time user changed the object
         self.userDecay = user_decay
         self.objectDecay = object_decay
 
@@ -132,8 +131,9 @@ class Mip:
     -----------------------------------------------------------------------------
     '''
 
-    #ASK: Should time be a decay factor? right now added as parameter
-    #ASK: using time from lastvisit, maybe should choode dofferent refrence point?
+    # ASK: Should time be a decay factor? right now added as parameter
+    # ASK: using time from lastvisit, maybe should choode dofferent refrence point?
+    # ASK: possible more features: time from last change, creation, etc.
 
     def compute_centrailty(self):
         self.centrality = nx.current_flow_betweenness_centrality(self.mip, weight='weight')
@@ -144,9 +144,12 @@ class Mip:
         gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
         """
         api_obj = self.centrality[obj]  # node centrality (apriori component)
+        if user is None or user not in self.users:
+            return self.alpha * api_obj
+
         # compute proximity between user node and object node using Cycle-Free-Edge-Conductance from Koren et al. 2007 or Adamic/Adar
         proximity = 0.0
-        if user in self.users and self.beta > 0:  # no point to compute proximity if beta1 is 0... (no weight)
+        if self.beta > 0:  # no point to compute proximity if beta1 is 0... (no weight)
             proximity = self.similarityMetric(self.users[user], obj)
 
         changeExtent = 0.0  # need to consider how frequently the object has been changed since user last known about it: user is userId (might not be in MIP), obj is object Node id
@@ -184,8 +187,8 @@ class Mip:
             edgeProximity = self.mip[s][t]['weight'] / self.mip.degree(s, weight='weight')
         return edgeWeight * edgeProximity + (1 - edgeWeight) * simpleProximity
 
-    #ASK: how does changeExtend changes when lastvisit and lastknown are the same?
-    #ASK: should time be a factor?
+    # ASK: how does changeExtend changes when lastvisit and lastknown are the same?
+    # ASK: should time be a factor?
     def changeExtent(self, userId, aoNode):
         """
         computes the extent/frequency to which an object was changed since the last time the user was notified about it
@@ -202,14 +205,13 @@ class Mip:
             print(f"This code last changed by the user {userId} himself!")
             return 0
 
-        numOfChanges = len(revs)-1-revs.index(fromRevision)
+        numOfChanges = len(revs) - 1 - revs.index(fromRevision)
         return numOfChanges / float(self.iteration - fromRevision)
 
     def rankObjects(self, user):
         if user not in self.users:
-            print(self.users)
             print("this is a new user! getting default rankings")
-            return self.getDefaultRankings()
+            user = None # will return the objects sorted by cenrality.
 
         tupledAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao)) \
                      for ao in self.getLiveAos(user))
@@ -218,23 +220,15 @@ class Mip:
     def rankChanged(self, user, time=None):
         if user not in self.users:
             print("this is a new user! getting last changes")
-            return self.getLastChanges()
-
-        userNode = self.users[user]
-        if time is None:
-            time = self.mip.node[userNode]['last_visit']
+            user = None
+        else:
+            userNode = self.users[user]
+            if time is None:
+                time = self.mip.node[userNode]['last_visit']
 
         changedAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao))
                       for ao in self.getLiveAos(user) if self.mip.node[ao]['revisions'][-1] > time)
         return sorted(changedAos, key=lambda x: x[1], reverse=True)
-
-    # TODO: Implament
-    def getLastChanges(self):
-        pass
-
-    # TODO: Implament
-    def getDefaultRankings(self):
-        pass
 
     '''
     -----------------------------------------------------------------------------
