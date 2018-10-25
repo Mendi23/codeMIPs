@@ -3,6 +3,7 @@ from itertools import count
 
 
 class MagicHash(UserDict):
+    # noinspection PyMissingConstructor
     def __init__(self):
         self.data = defaultdict(count().__next__)
         self.id2word = {}
