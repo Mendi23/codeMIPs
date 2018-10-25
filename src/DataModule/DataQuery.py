@@ -11,7 +11,7 @@ from DataModule.utils import *
 
 from pyutils.file_paths import STORAGE_DIR
 
-DEBUG_EXPORT = False
+CACHE_THE_DATA_MF = True
 DEBUG_1 = False
 
 PER_PAGE = 100
@@ -140,8 +140,16 @@ class DataExtractor:
                 yield from Storage.import_objects_from_file(fo, Models.Commit.create)
 
     def _iterate_commits(self, query: GithubQuery):
-        fo = open(self.jsons_filename.format(0), "w")
+        skip_n = 0
+        if CACHE_THE_DATA_MF:
+            for commit in self.load_commits():
+                yield commit
+                skip_n += 1
+
+        fo = open(self.jsons_filename.format(skip_n // PER_PAGE), "r+")
         for i, commit in enumerate(query.repo_iterate_commits()):
+            if i < skip_n: continue
+
             cobj = self._create_commit(commit)
 
             # ~~~~~~~~~ save patches mapping ~~~~~~~~~~~~~~~~
@@ -162,11 +170,11 @@ class DataExtractor:
 
             cobj.files.sort()  # place "RENAME" before others
 
-            if DEBUG_EXPORT:
+            if CACHE_THE_DATA_MF:
                 Storage.export_object_to_file(cobj, fo)
                 if i > 0 and i % PER_PAGE == 0:
                     fo.close()
-                    fo = open(self.jsons_filename.format(int(i / PER_PAGE)), "w")
+                    fo = open(self.jsons_filename.format(i // PER_PAGE), "r+")
             yield cobj
         ### END
 
@@ -254,7 +262,7 @@ if __name__ == "__main__":
         #     print(f"{i:03}: {commit.hexsha}")
         #     print(f"2 [{next(i):02}]- {commit.sha}: {commit.date_str}")
 
-        if DEBUG_EXPORT:
+        if CACHE_THE_DATA_MF:
             print("load:")
             commits = list(de.load_commits())
             print(len(commits))
