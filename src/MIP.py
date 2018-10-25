@@ -30,7 +30,6 @@ class Mip:
         # ASK: same for time-based decay
         # ASK: both can be moved to be upadted with each session
         # ASK: what if we want real apriuti info? for example, the head node that need to be on top every time - move to CSR
-
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
         self.beta = beta  # weight given to the proximity between the user and the object
         self.gamma = gamma  # weight given to the extent of change
@@ -82,6 +81,7 @@ class Mip:
 
     def updateMIP(self, session):
         self.iteration += 1
+        self.centrality = None
         user = session.user
         user_node = self.addUser(user)
         user_att = self.mip.node[user_node]
@@ -93,6 +93,7 @@ class Mip:
             ao_att = self.mip.node[ao_node]
             # ASK: why do we need deleted and what to do if actualy deleted?
             # ASK: plus, right now is considering deleted for determening interest etc. can we use it?
+            ao_att['deleted'] = False
             if act.actType == 'delete':  # label deleted objects as deleted
                 ao_att['deleted'] = True
 
@@ -131,15 +132,14 @@ class Mip:
     -----------------------------------------------------------------------------
     '''
 
-    #TODO: this funcion shoukd be called every time you try and make a pridiction
-    def compute_centrailty(self):
-        self.centrality = nx.current_flow_betweenness_centrality(self.mip, weight='weight')
-
     def DegreeOfInterestMIPs(self, user, obj):
         """
         Computes degree of interest between a user and an object
         gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
         """
+        if self.centrality is None:
+            self.centrality = nx.current_flow_betweenness_centrality(self.mip, weight='weight')
+
         api_obj = self.centrality[obj]  # node centrality (apriori component)
         if user is None or user not in self.users:
             return self.alpha * api_obj
