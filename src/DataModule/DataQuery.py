@@ -1,7 +1,9 @@
+import functools
 import itertools
 # import uritemplate, requests
+from functools import partial
 from os.path import join as pathjoin
-from typing import Dict
+from typing import Dict, Iterator
 from urllib.parse import urljoin
 
 from git import Repo, Commit
@@ -85,7 +87,7 @@ class GithubQuery:
     def num_of_commits(self):
         return self.repo.branches.master.commit.count(first_parent=True)
 
-    def repo_iterate_commits(self) -> typing.Iterator[Commit]:
+    def repo_iterate_commits(self) -> Iterator[Commit]:
         """
         Iterate over commits in "master" from the first (oldest) commit
         to the last.
@@ -121,32 +123,28 @@ class DataExtractor:
 
     def get_train_test_generator(self, repouri):
         self.query = query = GithubQuery.create(self.gitdir, repouri)
-        self.jsons_filename = pathjoin(self.storagedir,
-            "data." +
-            Storage.get_valid_filename(repouri) +
-            ".{:03}.jsons"
-            )
+        jsons_filename = pathjoin(self.storagedir,
+                                  Storage.get_valid_filename(repouri))
+        jsons_export = functools.partial(Storage.export_object_to_json_file,
+                                         encoder=CustomJsonEncoder)
+        jsons_import = functools.partial(Storage.import_objects_from_json_file,
+                                         decoder=Models.Commit.create,
+                                         decode_stacked=decode_json_stacked)
+        # noinspection PyTypeChecker
+        self.storage = Storage(jsons_filename, PER_PAGE, jsons_export, jsons_import)
 
         return Gen(int(query.num_of_commits() * self.ratio),
-            # enumerate(query.repo_iterate_commits())
             self._iterate_commits(query)
         )
 
     def load_commits(self):
-        for i in itertools.count():
-            fname = self.jsons_filename.format(i)
-            if not os.path.exists(fname): return
-            with open(fname, "r") as fo:
-                yield from Storage.import_objects_from_file(fo, Models.Commit.create)
+        return self.storage.load_all()
 
     def _iterate_commits(self, query: GithubQuery):
-        skip_n = 0
         if CACHE_THE_DATA_MF:
-            for commit in self.load_commits():
-                yield commit
-                skip_n += 1
+            yield from self.load_commits()
+        skip_n = self.storage.objects_count
 
-        fo = open(self.jsons_filename.format(skip_n // PER_PAGE), "r+")
         for i, commit in enumerate(query.repo_iterate_commits()):
             if i < skip_n: continue
 
@@ -171,14 +169,11 @@ class DataExtractor:
             cobj.files.sort()  # place "RENAME" before others
 
             if CACHE_THE_DATA_MF:
-                Storage.export_object_to_file(cobj, fo)
-                if i > 0 and i % PER_PAGE == 0:
-                    fo.close()
-                    fo = open(self.jsons_filename.format(i // PER_PAGE), "r+")
+                self.storage.save_obj(cobj)
             yield cobj
         ### END
 
-        fo.close()
+        self.storage.dispose()
 
     def _create_commit(self, commit) -> Models.Commit:
         cobj = Models.Commit()
@@ -247,7 +242,7 @@ class DataExtractor:
 
 if __name__ == "__main__":
     de = DataExtractor(STORAGE_DIR)
-    for source in KNOWN_SMALL_REPOS:
+    for source in KNOWN_SMALL_REPOS[:2]:
         gen = de.get_train_test_generator(source)
         i = itertools.count(1)
 
