@@ -7,10 +7,12 @@ Edited: Aug-Sep, 2018
 @editors: Uriel, Mendi
 '''
 from itertools import combinations
-from sortedcontainers import SortedList
+from pyutils.my_sorted import MySorted
 import networkx as nx
 import math
 
+
+# ASK: our proxy method for evaluation isn't good enough
 
 class Mip:
     """
@@ -18,7 +20,7 @@ class Mip:
     @:param user_decay, object_decay
     """
 
-    def __init__(self, alpha=0.2, beta=0.6, gamma=0.2, similarityMetric="adamic", user_decay=1.0, object_decay=1.0):
+    def __init__(self, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0, similarityMetric="adamic"):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
@@ -26,18 +28,16 @@ class Mip:
         self.nodeIDsToUsersIds = {}  # dictionary mapping between ids of nodes and user ids
         self.iteration = 0
         self.lastID = -1
-        # ASK: I canceled centrality as a constant, we'll calculate it every time we need a prediction
-        # ASK: same for time-based decay
-        # ASK: both can be moved to be upadted with each session
         # ASK: what if we want real apriuti info? for example, the head node that need to be on top every time - move to CSR
+        self.centrality = None
+        self.set_params(alpha,beta,gamma,user_decay,object_decay, similarityMetric)
+
+    def set_params(self, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0, similarityMetric="adamic"):
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
         self.beta = beta  # weight given to the proximity between the user and the object
         self.gamma = gamma  # weight given to the extent of change
         self.userDecay = user_decay
         self.objectDecay = object_decay
-
-        self.centrality = None
-
         # how to measure proximity/similarity in the newtork
         if similarityMetric == "edge":
             self.similarityMetric = self.edgeBasedProximity
@@ -48,11 +48,12 @@ class Mip:
         else:
             raise ValueError('Didn\'t define a valid similarity metric')
 
-    def getLiveAos(self, user=None, data=False):  # generator of mip nodes that represent live object
-        nodes = filter(lambda x: (x[1], x[2]), self.mip.edges_iter(self.users[user])) \
-            if user is not None else self.mip.nodes_iter(data=True)
-        objects = filter(lambda node, att: att['node_type'] == 'object' and not att['deleted'], nodes)
-        yield from objects if data else (node for node, _ in objects)
+    def getLiveAos(self, user=None, data=False):
+        # generator of mip nodes that represent live object
+        nodes = self.mip.nodes_iter(data=True) if user is None else \
+            ((n, self.mip.node[n]) for n in self.mip.neighbors_iter(self.users[user]))
+        liveNodes = ((n, att) for n, att in nodes if att['node_type'] == 'object' and not att['deleted'])
+        yield from liveNodes if data else (n for n, _ in liveNodes)
 
     def addUser(self, user_name):
         if user_name not in self.users:
@@ -60,7 +61,7 @@ class Mip:
             self.users[user_name] = self.lastID
             attr = {'node_type': 'user',
                     'last_visit': -1}
-            self.mip.add_node(self.lastID, attr)
+            self.mip.add_node(self.lastID, **attr)
             self.nodeIDsToUsersIds[self.lastID] = user_name
         return self.users[user_name]
 
@@ -70,9 +71,9 @@ class Mip:
             self.objects[object_id] = self.lastID
             attr = {'node_type': 'object',
                     'deleted': False,
-                    'revisions': SortedList()
+                    'revisions': MySorted()
                     }
-            self.mip.add_node(self.lastID, attr)
+            self.mip.add_node(self.lastID, **attr)
             self.nodeIDsToObjectsIds[self.lastID] = object_id
         return self.objects[object_id]
 
@@ -97,17 +98,18 @@ class Mip:
             if act.actType == 'delete':  # label deleted objects as deleted
                 ao_att['deleted'] = True
 
-            if ao_att['revisions'][-1] != self.iteration:  # no need to check if we assume only one action per object
-                ao_att['revisions'].append(self.iteration)  # add revision
-                changedAOs.append(ao_node)
+            assert ao_node not in changedAOs, "assuming only one action per object"
+            ao_att['revisions'].append(self.iteration)  # add revision.
+            changedAOs.append(ao_node)
             self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc + self.userDecay)
 
-        for _, att in self.getLiveAos(user, data=True):
-            att['weight'] = max(0, att['weight'] - self.userDecay)
+        for n in self.getLiveAos(user):
+            self.mip[user_node][n]['weight'] = max(0, self.mip[user_node][n]['weight'] - self.userDecay)
 
         # ASK: why do we need both increment between objects and decay for all others?
         # ASK why is the increment set to 1 and the decay vary?
         # ASK should the increment be by act.weightInc?
+        # ASK: for example, if the action is "create", we want strong connnection
         for node1, node2 in combinations(changedAOs, 2):
             self.updateEdge(node1, node2, 'ao-ao', 1.0 + self.objectDecay)
 
@@ -128,33 +130,9 @@ class Mip:
 
     '''
     -----------------------------------------------------------------------------
-    MIPs reasoning functions start
+    Proximity functions start
     -----------------------------------------------------------------------------
     '''
-
-    def DegreeOfInterestMIPs(self, user, obj):
-        """
-        Computes degree of interest between a user and an object
-        gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
-        """
-        if self.centrality is None:
-            self.centrality = nx.current_flow_betweenness_centrality(self.mip, weight='weight')
-
-        api_obj = self.centrality[obj]  # node centrality (apriori component)
-        if user is None or user not in self.users:
-            return self.alpha * api_obj
-
-        # compute proximity between user node and object node using Cycle-Free-Edge-Conductance from Koren et al. 2007 or Adamic/Adar
-        proximity = 0.0
-        if self.beta > 0:  # no point to compute proximity if beta1 is 0... (no weight)
-            proximity = self.similarityMetric(self.users[user], obj)
-
-        changeExtent = 0.0  # need to consider how frequently the object has been changed since user last known about it: user is userId (might not be in MIP), obj is object Node id
-        if self.gamma > 0:
-            changeExtent = self.changeExtent(user, obj)
-
-        return self.alpha * api_obj + self.beta * proximity + self.gamma * changeExtent
-        # ASK: check that scales work out, otherwise need some normalization
 
     def adamicAdarProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
         """
@@ -184,6 +162,43 @@ class Mip:
             edgeProximity = self.mip[s][t]['weight'] / self.mip.degree(s, weight='weight')
         return edgeWeight * edgeProximity + (1 - edgeWeight) * simpleProximity
 
+    '''
+    -----------------------------------------------------------------------------
+    Proximity functions End
+    -----------------------------------------------------------------------------
+    '''
+
+    '''
+    -----------------------------------------------------------------------------
+    MIPs reasoning functions start
+    -----------------------------------------------------------------------------
+    '''
+
+    def DegreeOfInterestMIPs(self, user, obj):
+        """
+        Computes degree of interest between a user and an object
+        gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
+        """
+        if self.centrality is None:
+            # ASK: need better centrality!!!
+            self.centrality = nx.degree_centrality(self.mip)  # , weight='weight')
+
+        api_obj = 0.0
+        if self.alpha > 0:
+            api_obj = self.centrality[obj]  # node centrality (apriori component)
+
+        # compute proximity between user node and object node using Cycle-Free-Edge-Conductance from Koren et al. 2007 or Adamic/Adar
+        proximity = 0.0
+        if self.beta > 0 and user in self.users:  # no point to compute proximity if beta1 is 0... (no weight)
+            proximity = self.similarityMetric(self.users[user], obj)
+
+        changeExtent = 0.0  # need to consider how frequently the object has been changed since user last known about it: user is userId (might not be in MIP), obj is object Node id
+        if self.gamma > 0:
+            changeExtent = self.changeExtent(user, obj)
+
+        return self.alpha * api_obj + self.beta * proximity + self.gamma * changeExtent
+        # ASK: check that scales work out, otherwise need some normalization
+
     # ASK: how does changeExtend changes when lastvisit and lastknown are the same?
     # ASK: should time be a factor?
     def changeExtent(self, userId, aoNode):
@@ -191,24 +206,19 @@ class Mip:
         computes the extent/frequency to which an object was changed since the last time the user was notified about it
         will be a component taken into account in degree of interest
         """
-        fromRevision = 0  # in case user does not exist yet or has never known about this object, start from revision 0
+        fromRevision = 1  # in case user does not exist yet or has never known about this object, start from revision 0
         if userId in self.users and self.mip.has_edge(self.users[userId], aoNode):
             userNode = self.users[userId]
-            if self.mip.has_edge(userNode, aoNode):
-                fromRevision = self.mip[userNode][aoNode]['lastKnown']  # get the last time the user knew what the value of the object was
+            fromRevision = self.mip[userNode][aoNode]['lastKnown']  # get the last time the user knew what the value of the object was
+
         revs = self.mip.node[aoNode]['revisions']
-
-        if revs[-1] == fromRevision:
-            print(f"This code last changed by the user {userId} himself!")
-            return 0
-
-        numOfChanges = len(revs) - 1 - revs.index(fromRevision)
+        numOfChanges = len(revs) - revs.index(fromRevision)
         return numOfChanges / float(self.iteration - fromRevision)
 
     def rankObjects(self, user):
         if user not in self.users:
             print("this is a new user! getting default rankings")
-            user = None # will return the objects sorted by cenrality.
+            user = None  # will return the objects sorted by cenrality.
 
         tupledAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao)) \
                      for ao in self.getLiveAos(user))
@@ -234,7 +244,7 @@ class Mip:
     '''
 
     def __str__(self):
-        return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}_{self.similarityMetric}"
+        return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}"
 
     def createNodeLabels(self, nodeTypes='both'):
         labels = {}

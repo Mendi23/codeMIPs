@@ -17,3 +17,5 @@ g.node['a']['xx'] = 5
 t = g.node['a']
 t['dfgf'] = 7
 print(g.node['a'])
+print(g.node['b'])
+print(list(g.nodes_iter()))

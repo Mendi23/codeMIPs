@@ -92,8 +92,8 @@ class GithubQuery:
         Excluding forks to other branches.
         """
         return self.repo.iter_commits(MASTER,
-                                      first_parent=True,
-                                      reverse=True)
+            first_parent=True,
+            reverse=True)
 
 
 class DataExtractor:
@@ -122,15 +122,15 @@ class DataExtractor:
     def get_train_test_generator(self, repouri):
         self.query = query = GithubQuery.create(self.gitdir, repouri)
         self.jsons_filename = pathjoin(self.storagedir,
-                                       "data." +
-                                       Storage.get_valid_filename(repouri) +
-                                       ".{:03}.jsons"
-                                       )
+            "data." +
+            Storage.get_valid_filename(repouri) +
+            ".{:03}.jsons"
+            )
 
         return Gen(int(query.num_of_commits() * self.ratio),
-                   # enumerate(query.repo_iterate_commits())
-                   self._iterate_commits(query)
-                   )
+            # enumerate(query.repo_iterate_commits())
+            self._iterate_commits(query)
+        )
 
     def load_commits(self):
         for i in itertools.count():
