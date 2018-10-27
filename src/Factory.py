@@ -43,16 +43,16 @@ class Provider:
 
 
 if __name__ == '__main__':
-    p = Provider(1)
+    p = Provider(13)
     for commits in p.X:
-        print("repo...")
+        print("processing repo...")
         for commit in commits:
-            print("  commit...")
+            print("  commit actions:")
             for action in commit:
                 print("    " + str(action))
 
     for users in p.Y:
-        print("repo...")
+        print("processing repo...")
         for user, files  in users.items():
             print("  " + str(user))
             print("     " + str(files))

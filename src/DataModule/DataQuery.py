@@ -231,8 +231,8 @@ class DataExtractor:
         else:
             root = groups["root"] or ""
             rest = groups["rest"] or ""
-            source = root + (groups["before"] or "") + rest
-            target = root + (groups["after"] or "") + rest
+            source = (root + (groups["before"] or "") + rest).replace("//", "/")
+            target = (root + (groups["after"] or "") + rest).replace("//", "/")
 
         if source != target:
             changetype = Models.ChangeEnum.RENAMED
