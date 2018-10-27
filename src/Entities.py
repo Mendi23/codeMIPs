@@ -30,9 +30,10 @@ class Action:
         self.ao = ao
         self.actType = actType  # view, edit, add, delete
         self.weightInc = weightInc
+        self.mipNodeID = None
 
-    def __str__(self):
-        return f"ao = {self.ao}\nactType = {self.actType}weightInc = {self.weightInc}\nmipNodeID= {self.mipNodeID}\n"
+    def __repr__(self):
+        return f"< ao = {self.ao}, actType = {self.actType}, weightInc = {self.weightInc}, mipNodeID= {self.mipNodeID} >"
 
 
 if __name__ == '__main__':

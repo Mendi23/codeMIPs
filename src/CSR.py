@@ -8,17 +8,14 @@ import json
 import networkx as nx
 from pyutils import hashing
 from Entities import Action
-from unidiff import PatchedFile, PatchSet
-import unidiff
 
 import DataModule.models as Models
 
 
 class CsrFiles:
-    def __init__(self, patchSetAction=PatchSet):
+    def __init__(self):
         self.csr = nx.Graph()
         self.mapping = hashing.MagicHash()
-        self.PatchSet = patchSetAction
 
     def apply_changes_from_commit(self, commit: Models.Commit):
         file: Models.FileChangeset = None  # for autocorrect

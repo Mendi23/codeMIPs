@@ -73,10 +73,10 @@ class GithubQuery:
         ret.uri = urljoin(BASE_URL, repouri)
         ret.storage = pathjoin(storage, repouri)
         if os.path.exists(ret.storage):
-            print("load existing repo..")
+            print(f"load existing repo: {repouri}..")
             ret.repo = Repo(ret.storage)
         else:
-            print("cloning repo..")
+            print(f"cloning repo: {repouri}..")
             ret.repo = Repo.clone_from(ret.uri, ret.storage, bare=True)
 
         print("fetch..")
@@ -94,8 +94,8 @@ class GithubQuery:
         Excluding forks to other branches.
         """
         return self.repo.iter_commits(MASTER,
-            first_parent=True,
-            reverse=True)
+                                      first_parent=True,
+                                      reverse=True)
 
 
 class DataExtractor:
@@ -108,32 +108,39 @@ class DataExtractor:
               r"(?:\{" \
               f"(?P<before>{re_path_full})? => (?P<after>{re_path_full})?" \
               r"\})" \
-              f"\/?(?P<rest>{re_path_full})?" \
+              f"(?P<rest>\/?{re_path_full})?" \
               "|" \
               f"(?P<before2>{re_path_full})? => (?P<after2>{re_path_full})?" \
               "|" \
-              f"(?P<rest2>{re_path_full})" \
+              f"(?P<rest_only>{re_path_full})" \
               ")$"
     re_match = re.compile(re_patt)
 
-    def __init__(self, savedir, ratio=None):
+    def __init__(self, savedir, repouri, ratio=None, k_commits=None):
         self.ratio = ratio if ratio is not None else 0.75
+        self.k_commits = k_commits if k_commits is not None else -1
         self.gitdir = Storage.init_save_dir(savedir)
         self.storagedir = Storage.init_save_dir(self.gitdir + "_cache")
+        self.repouri = repouri
 
-    def get_train_test_generator(self, repouri):
-        self.query = query = GithubQuery.create(self.gitdir, repouri)
+    def get_train_test_generator(self) -> Gen[Models.Commit]:
+        self.query = query = GithubQuery.create(self.gitdir, self.repouri)
         jsons_filename = pathjoin(self.storagedir,
-                                  Storage.get_valid_filename(repouri))
+                                  Storage.get_valid_filename(self.repouri))
         jsons_export = Storage.export_object_to_json_file
         jsons_import = functools.partial(Storage.import_objects_from_json_file,
                                          decoder=Models.Commit.create)
         # noinspection PyTypeChecker
         self.storage = Storage(jsons_filename, PER_PAGE, jsons_export, jsons_import)
 
-        return Gen(int(query.num_of_commits() * self.ratio),
-            self._iterate_commits(query)
-        )
+        num_of_commits = query.num_of_commits()
+        first_slice = int(num_of_commits * self.ratio)
+        if self.k_commits > 0:
+            assert num_of_commits > self.k_commits, \
+                f"Asked to slice {self.k_commits} commits but got only total of {num_of_commits} commits."
+            first_slice = num_of_commits - self.k_commits
+
+        return Gen(first_slice, self._iterate_commits(query))
 
     def load_commits(self):
         return self.storage.load_all()
@@ -142,6 +149,8 @@ class DataExtractor:
         if CACHE_THE_DATA_MF:
             yield from self.load_commits()
         skip_n = self.storage.objects_count
+        if skip_n > 0:
+            print("SOME OF THE DATA WERE LOADED FROM CACHE!")
 
         for i, commit in enumerate(query.repo_iterate_commits()):
             if i < skip_n: continue
@@ -214,8 +223,8 @@ class DataExtractor:
         groups = self.re_match.match(fname)
         assert groups, f"'{fname}' was not recognized by my regex"
 
-        if groups["rest2"]:
-            source = target = groups["rest2"]
+        if groups["rest_only"]:
+            source = target = groups["rest_only"]
         elif groups["before2"] or groups["after2"]:
             source = groups["before2"] or ""
             target = groups["after2"] or ""
@@ -239,9 +248,9 @@ class DataExtractor:
 
 
 if __name__ == "__main__":
-    de = DataExtractor(STORAGE_DIR)
     for source in KNOWN_SMALL_REPOS[:2]:
-        gen = de.get_train_test_generator(source)
+        de = DataExtractor(STORAGE_DIR, source)
+        gen = de.get_train_test_generator()
         i = itertools.count(1)
 
         print(de.query.num_of_commits())

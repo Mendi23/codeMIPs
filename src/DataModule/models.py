@@ -5,6 +5,8 @@ import json
 from datetime import datetime
 from enum import Enum
 
+from typing import List
+
 
 def _encode_string(s: str) -> str:
     compressed = gzip.compress(str(s).encode())
@@ -65,16 +67,26 @@ class User(Base):
         self.name = None
         self.email = None
 
+    def __hash__(self):
+        return hash(f"{self.email}_{self.name}")
+
+    def __eq__(self, other):
+        return (
+            other != None and
+            isinstance(other, self.__class__) and
+            self.name == other.name and
+            self.email == other.email
+        )
 
 class Commit(Base):
     def __init__(self):
         super().__init__()
         self.sha = ""
         self.message = ""
-        self.author = None
-        self.committer = None
+        self.author: User = None
+        self.committer: User = None
         self.date_timestamp = None
-        self.files = []
+        self.files: List[FileChangeset] = []
 
     @property
     def date_str(self):

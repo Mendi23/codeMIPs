@@ -3,7 +3,7 @@ from src.MIP import Mip
 from numpy import array, inf
 from DataModule.DataQuery import DataExtractor
 from pyutils.file_paths import STORAGE_DIR
-from CSR import Csr
+from CSR import CsrFiles
 
 
 def eval_func(x, *args) -> float:
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     k=[1,3,10]
     res = []
     model = Mip()
-    codeGraph = Csr()
+    codeGraph = CsrFiles()
 
     for i in k:
         for X, y in get_split_sessions():

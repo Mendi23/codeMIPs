@@ -1,0 +1,25 @@
+urielha/heapdict
+urielha/SimpleObjectAppender
+
+TheAlgorithms/C-Plus-Plus
+_local_/CodeMIPs
+
+# TheAlgorithms/C
+# fragglet/c-algorithms
+# nlohmann/json
+# stedolan/jq
+# Microsoft/DirectXShaderCompiler
+# mozilla/DeepSpeech
+# Alexpux/mingw-w64
+
+## BIG REPOSITORIES:
+# videolan/vlc
+# tensorflow/tensorflow
+# nginx/nginx
+# electron/electron
+# bitcoin/bitcoin
+# google/protobuf
+# mozilla/rr
+# mozilla/gecko-dev
+# Microsoft/ELL
+# torvalds/linux

@@ -1,7 +1,7 @@
 import itertools
 import json, os, re
 
-from typing import IO, Iterable, Callable
+from typing import IO, Iterable, Callable, Generic, TypeVar
 
 import DataModule.models as Models
 
@@ -122,8 +122,9 @@ class Storage:
         return open(self.filename.format(i // self.page_size), "a+")
 
 
-class Gen:
-    def __init__(self, stop, gen):
+T = TypeVar('T')
+class Gen(Generic[T]):
+    def __init__(self, stop: int, gen: Iterable[T]):
         self.stop = stop
         self._gen = iter(gen)
         self.i = 0
@@ -131,7 +132,7 @@ class Gen:
     def __iter__(self):
         return self
 
-    def __next__(self):
+    def __next__(self) -> T:
         if self.i == self.stop:
             self.i += 1
             raise StopIteration()
