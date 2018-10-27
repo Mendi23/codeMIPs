@@ -17,6 +17,7 @@ import functools
 
 from pyutils.file_paths import STORAGE_DIR
 
+
 class GenTests(unittest.TestCase):
     def test_generator(self):
         gen = Gen(10, range(100))
@@ -35,15 +36,19 @@ class GenTests(unittest.TestCase):
 
 class StorageTests(unittest.TestCase):
     DIR = path.join(STORAGE_DIR, "test_storage_dir")
+    FILE = path.join(DIR, "file")
 
     def setUp(self):
         self.fo = None
         self.obj = None
         self.objects = [1, 2, 3, 4]
-        self.storage = Storage(self.DIR, 1, self.export_obj_to_file, self.import_from_file)
+        os.mkdir(self.DIR)
+        self.storage = Storage(self.FILE, 1, self.export_obj_to_file, self.import_from_file)
 
     def tearDown(self):
         self.storage.dispose()
+        if os.path.exists(self.DIR):
+            shutil.rmtree(self.DIR)
 
     def export_obj_to_file(self, obj, fo):
         self.assertEquals(obj, self.obj)
@@ -63,9 +68,16 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(self.storage.objects_count, 3)
 
     def test_load(self):
+        open(self.storage.filename.format(0), "w").close()
         objects = list(self.storage.load_all())
-        self.assertEqual(len(objects), len(self.objects))
+        self.assertEqual(objects, self.objects)
         self.assertEqual(self.storage.objects_count, len(self.objects))
+
+        open(self.storage.filename.format(1), "w").close()
+        objects = list(self.storage.load_all())
+        self.assertEqual(len(objects), len(self.objects) * 2)
+        self.assertEqual(self.storage.objects_count, len(self.objects) * 3,
+                         "should remember previous load")
 
 
 if __name__ == '__main__':
