@@ -125,11 +125,9 @@ class DataExtractor:
         self.query = query = GithubQuery.create(self.gitdir, repouri)
         jsons_filename = pathjoin(self.storagedir,
                                   Storage.get_valid_filename(repouri))
-        jsons_export = functools.partial(Storage.export_object_to_json_file,
-                                         encoder=CustomJsonEncoder)
+        jsons_export = Storage.export_object_to_json_file
         jsons_import = functools.partial(Storage.import_objects_from_json_file,
-                                         decoder=Models.Commit.create,
-                                         decode_stacked=decode_json_stacked)
+                                         decoder=Models.Commit.create)
         # noinspection PyTypeChecker
         self.storage = Storage(jsons_filename, PER_PAGE, jsons_export, jsons_import)
 

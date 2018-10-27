@@ -54,14 +54,14 @@ class Storage:
         return re.sub(r"(?u)[^-\w.]", "", s)
 
     @staticmethod
-    def export_object_to_json_file(obj, fo, encoder):
-        data = json.dumps(obj, indent=2, cls=encoder)
+    def export_object_to_json_file(obj, fo):
+        data = json.dumps(obj, indent=2, cls=CustomJsonEncoder)
         fo.write(os.linesep)
         fo.write(data)
         fo.flush()
 
     @staticmethod
-    def import_objects_from_json_file(fo, decoder, decode_stacked):
+    def import_objects_from_json_file(fo, decoder):
         """
         :param fo: file object
         :param decoder: decoder for one object
@@ -72,7 +72,7 @@ class Storage:
         data = fo.read()
         return [
             decoder(obj)
-            for obj in decode_stacked(data)
+            for obj in decode_json_stacked(data)
             if any(obj)
         ]
 

@@ -14,7 +14,7 @@ import unidiff
 import DataModule.models as Models
 
 
-class Csr:
+class CsrFiles:
     def __init__(self, patchSetAction=PatchSet):
         self.csr = nx.Graph()
         self.mapping = hashing.MagicHash()
@@ -36,7 +36,7 @@ class Csr:
                 status = "renamed"
                 objId = self.mapping[file.target]
 
-            elif file.changetype == Models.ChangeEnum.RENAMED:
+            elif file.changetype == Models.ChangeEnum.DELETED:
                 status = "removed"
                 objId = self.mapping.pop(file.source)
 
@@ -45,3 +45,5 @@ class Csr:
 
             yield Action(objId, status)
 
+class CsrCode:
+    pass

@@ -3,6 +3,7 @@ Created on Sep 7, 2018
 
 @authors: Uriel, Mendi
 """
+import io
 import os
 import shutil
 import unittest
@@ -14,7 +15,7 @@ from DataModule.utils import Storage, Gen
 import itertools
 import functools
 
-STORAGE_DIR = path.join(path.pardir, "DataModule", "Storage")
+from pyutils.file_paths import STORAGE_DIR
 
 class GenTests(unittest.TestCase):
     def test_generator(self):
@@ -33,76 +34,39 @@ class GenTests(unittest.TestCase):
 
 
 class StorageTests(unittest.TestCase):
-    SOURCE_DIR = path.join(STORAGE_DIR, "nlohmann_json")
-    DIR = "test_storage_dir"
-    REPO = "repo_name"
-    REPO_BACKUP = "repo_name_bckup"
-    NON_EXISTS_REPO = "kuku_kuku_repo"
-
-    @classmethod
-    def setUpClass(cls):
-        StorageTests.tearDownClass()
-        os.mkdir(cls.DIR)
-        shutil.copytree(cls.SOURCE_DIR,
-                        path.join(cls.DIR, cls.REPO))
-
-    @classmethod
-    def tearDownClass(cls):
-        if path.exists(cls.DIR):
-            shutil.rmtree(cls.DIR)
+    DIR = path.join(STORAGE_DIR, "test_storage_dir")
 
     def setUp(self):
-        self.storage = None
-        shutil.copytree(path.join(self.DIR, self.REPO),
-                        path.join(self.DIR, self.REPO_BACKUP))
+        self.fo = None
+        self.obj = None
+        self.objects = [1, 2, 3, 4]
+        self.storage = Storage(self.DIR, 1, self.export_obj_to_file, self.import_from_file)
 
     def tearDown(self):
-        if self.storage:
-            self.storage.dispose()
-        # remove non_exists repo (if created)
-        non_exists_repo = path.join(self.DIR, self.NON_EXISTS_REPO)
-        if path.exists(non_exists_repo):
-            shutil.rmtree(non_exists_repo)
+        self.storage.dispose()
 
-        # return to backup repo
-        shutil.rmtree(path.join(self.DIR, self.REPO))
-        os.rename(path.join(self.DIR, self.REPO_BACKUP),
-                  path.join(self.DIR, self.REPO))
+    def export_obj_to_file(self, obj, fo):
+        self.assertEquals(obj, self.obj)
+        self.assertIsInstance(fo, io.IOBase)
+        self.assertNotEqual(self.fo, fo)
+        self.fo = fo
 
-    def test_sanity(self):
-        self.storage = storage = Storage(self.DIR, self.REPO)
-        self.assertEqual(storage.commits_len, 2663)
+    def import_from_file(self, fo):
+        self.assertIsInstance(fo, io.IOBase)
+        return self.objects
 
-        # pages
-        pages = storage.get_pages()
-        self.assertGreater(len(pages), 0)
-        pagenum, commits = pages.popitem()
-        self.assertGreater(len(commits), 0)
-        self.assertGreater(pagenum, 1)
+    def test_save(self):
+        self.obj = 1
+        self.storage.save_obj(self.obj)
+        self.storage.save_obj(self.obj)
+        self.storage.save_obj(self.obj)
+        self.assertEqual(self.storage.objects_count, 3)
 
-    def test_add_pages(self):
-        commit = Models.CommitPatch()
-        commit.patch = "diff --git a/1 b/1\n" \
-                        "--- /dev/null\n" \
-                        "+++ b/bla.py\n" \
-                        "@@ -0,0 +1,6 @@"
+    def test_load(self):
+        objects = list(self.storage.load_all())
+        self.assertEqual(len(objects), len(self.objects))
+        self.assertEqual(self.storage.objects_count, len(self.objects))
 
-        self.storage = storage = Storage(self.DIR, self.NON_EXISTS_REPO)
-        self.assertEqual(storage.commits_len, -1)
-        storage.add_page(1, [commit])
-        storage.commits_len = 1
-        pages = storage.get_pages()
-        self.assertIn(1, pages)
-        self.assertEqual(len(pages[1]), 1)
-        self.assertEquals(pages[1][0].patch, commit.patch)
-        storage.dispose()
-
-        self.storage = storage = Storage(self.DIR, self.NON_EXISTS_REPO)
-        self.assertEqual(storage.commits_len, 1)
-        n, commits = storage.get_pages().popitem()
-        self.assertEqual(n, 1)
-        self.assertEqual(commits[0].patch, commit.patch)
-        storage.dispose()
 
 if __name__ == '__main__':
     unittest.main()
