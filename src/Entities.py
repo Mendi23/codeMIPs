@@ -35,6 +35,16 @@ class Action:
     def __repr__(self):
         return f"< ao = {self.ao}, actType = {self.actType}, weightInc = {self.weightInc}, mipNodeID= {self.mipNodeID} >"
 
+    def __hash__(self):
+        return hash(hash(self.ao) * 10 + hash(self.actType) % 10)
+
+    def __eq__(self, o: object) -> bool:
+        return (
+            o != None and
+            isinstance(o, Action) and
+            self.ao == o.ao and self.actType == o.actType
+        )
+
 
 if __name__ == '__main__':
     pass

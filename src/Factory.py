@@ -7,6 +7,9 @@ from pyutils.file_paths import STORAGE_DIR, REPOSITORIES_LIST_FILE
 
 class Provider:
     def __init__(self, k_commits):
+        """
+        IMPORTANT: Assuming the caller will consume the X before consuming Y.
+        """
         gen = (line.strip().split("#", 1)[0]
                     for line in open(REPOSITORIES_LIST_FILE))
         self.repos = [repo for repo in gen if repo]
@@ -17,8 +20,15 @@ class Provider:
         self.k_commits = k_commits
         self._super_generators = {}
 
+        # This is important:
+        ## the X list is not generator so all the preperations before run would be ready
+        ## avoiding surprises (not all, but some) in the middle of the process.
         self.X = [self._getTrain(repo)
                   for repo in self.repos]
+
+        # Assuming that the caller will finish query the X before stating on Y.
+        ## Y is a generator so it will wait after processing the X.
+        ## (otherwise - it will provide bugs)
         self.Y = (self._getTest(repo)
                   for repo in self.repos)
 
@@ -43,7 +53,7 @@ class Provider:
 
 
 if __name__ == '__main__':
-    p = Provider(13)
+    p = Provider(1)
     for commits in p.X:
         print("processing repo...")
         for commit in commits:
