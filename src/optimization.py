@@ -11,8 +11,8 @@ from Factory import Provider
 def eval_func(x, *args) -> float:
     for mip in mip_models:
         mip.set_params(*x)
-
-    for 
+    #ASK: how to evaluate? on how many items?
+    for
 
 
 
