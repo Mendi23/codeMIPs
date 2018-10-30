@@ -4,6 +4,13 @@ from CSR import CsrFiles
 from DataModule.DataQuery import DataExtractor
 from pyutils.file_paths import STORAGE_DIR, REPOSITORIES_LIST_FILE
 
+class Repo:
+    def __init__(self, name, gen):
+        self.gen = gen
+        self.name = name
+
+    def __iter__(self):
+        return self.gen
 
 class Provider:
     def __init__(self, k_commits):
@@ -33,36 +40,23 @@ class Provider:
                   for repo in self.repos)
 
     def _getTrain(self, repo):
-        code_graph = CsrFiles()
         data_extractor = DataExtractor(STORAGE_DIR, repo, k_commits=self.k_commits)
         ttgen = data_extractor.get_train_test_generator()
         self._super_generators[repo] = ttgen
-        return (
-            code_graph.apply_changes_from_commit(commit)
-            for commit in ttgen
-        )
+        return Repo(repo, ttgen)
 
     def _getTest(self, repo):
-        ttgen = self._super_generators[repo]
-        users = defaultdict(set)
-        for commit in ttgen:
-            users[commit.author].update(file.source for file in commit.files)
-
-        return users
-
+        return Repo(repo, self._super_generators[repo])
 
 
 if __name__ == '__main__':
     p = Provider(1)
-    for commits in p.X:
-        print("processing repo...")
-        for commit in commits:
-            print("  commit actions:")
-            for action in commit:
-                print("    " + str(action))
+    for repo in p.X:
+        print(f"processing repo {repo.name}")
+        for commit in repo:
+            print((commit.sha, commit.message))
 
-    for users in p.Y:
-        print("processing repo...")
-        for user, files  in users.items():
-            print("  " + str(user))
-            print("     " + str(files))
+    for repo in p.Y:
+        print(f"processing repo {repo.name}")
+        for commit in repo:
+            print((commit.sha, commit.message))
