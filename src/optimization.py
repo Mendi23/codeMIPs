@@ -21,16 +21,18 @@ def eval_func(x, *args) -> float:
 
 
 if __name__ == "__main__":
-    k = [10, 5, 3, 1]  # k must be in decending order
-    p = Provider(k[0])
+    #ASK: we can't evaluate for different k, need k=1 every time.
+    p = Provider(0.8)
 
     mip_models = []
+    csr_models = []
 
     for repo in p.X:
         mip_models.append(Mip(f"{repo.name}"))
+        csr_models.append(CsrFiles())
         for commit in repo:
             session = Session(commit.author.name, commit.date_str)
-            for action in commit:
+            for action in csr_models[-1].apply_changes_from_commit(commit):
                 session.addAction(action)
             mip_models[-1].updateMIP(session)
 
