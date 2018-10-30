@@ -13,7 +13,7 @@ class Repo:
         return self.gen
 
 class Provider:
-    def __init__(self, k_commits):
+    def __init__(self, ratio):
         """
         IMPORTANT: Assuming the caller will consume the X before consuming Y.
         """
@@ -24,7 +24,7 @@ class Provider:
         for repo in self.repos:
             print(f" - {repo}")
 
-        self.k_commits = k_commits
+        self.ratio = ratio
         self._super_generators = {}
 
         # This is important:
@@ -40,7 +40,7 @@ class Provider:
                   for repo in self.repos)
 
     def _getTrain(self, repo):
-        data_extractor = DataExtractor(STORAGE_DIR, repo, k_commits=self.k_commits)
+        data_extractor = DataExtractor(STORAGE_DIR, repo, ratio=self.ratio)
         ttgen = data_extractor.get_train_test_generator()
         self._super_generators[repo] = ttgen
         return Repo(repo, ttgen)
@@ -50,7 +50,7 @@ class Provider:
 
 
 if __name__ == '__main__':
-    p = Provider(1)
+    p = Provider(0.8)
     for repo in p.X:
         print(f"processing repo {repo.name}")
         for commit in repo:
