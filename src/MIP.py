@@ -20,7 +20,7 @@ class Mip:
     @:param user_decay, object_decay
     """
 
-    def __init__(self, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0, similarityMetric="adamic"):
+    def __init__(self, model_name =None, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0, similarityMetric="adamic"):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
@@ -28,6 +28,7 @@ class Mip:
         self.nodeIDsToUsersIds = {}  # dictionary mapping between ids of nodes and user ids
         self.iteration = 0
         self.lastID = -1
+        self.name = model_name
         # ASK: what if we want real apriuti info? for example, the head node that need to be on top every time - move to CSR
         self.centrality = None
         self.set_params(alpha,beta,gamma,user_decay,object_decay, similarityMetric)
