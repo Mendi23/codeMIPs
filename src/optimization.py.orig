@@ -3,8 +3,12 @@ from src.MIP import Mip
 from numpy import array, inf
 from DataModule.DataQuery import DataExtractor
 from pyutils.file_paths import STORAGE_DIR
+<<<<<<< HEAD
 from CSR import CsrFiles
+=======
+from CSR import Csr
 from Entities import Session
+>>>>>>> bubu
 
 
 def eval_func(x, *args) -> float:
@@ -15,9 +19,16 @@ def eval_func(x, *args) -> float:
 
 if __name__ == "__main__":
     k=[10,5,3,1] # k must be in decending order
+    res = []
+    model = Mip()
+<<<<<<< HEAD
+    codeGraph = CsrFiles()
+=======
+    codeGraph = Csr()
     p = Provider(k[0])
+>>>>>>> bubu
 
-    for X, y in p:
+    
 
     for i in k:
         for X, y in get_split_repos(i):
