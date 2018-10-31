@@ -1,27 +1,53 @@
 from scipy.optimize import minimize, Bounds
 from src.MIP import Mip
 from numpy import array, inf
-from DataModule.DataQuery import DataExtractor
-from pyutils.file_paths import STORAGE_DIR
 from CSR import CsrFiles
-from Entities import Session
 from Factory import Provider
+from copy import deepcopy
+from prettytable import PrettyTable as pt
+
+
+def verbose_print(s):
+    print(s)
 
 
 def eval_func(x, *args) -> float:
-    for mip in mip_models:
-        mip.set_params(*x)
-    #ASK: how to evaluate? on how many items?
-    for
+    # ASK: how to evaluate? on how many items? what formula?
+    mip, csr = deepcopy(args)
+    verbose_print(f"current values: {x}")
+    score = []
+    for i, repo in enumerate(y):
+        verbose_print(f"for repo: {repo.name}")
+        mip[i].set_params(*x)
+        score.append(0.0)
+        t = pt(['user', 'score', 'top 3', 'top 5', 'top 10'])
+        for commit in repo:
+            session = csr[i].commit_to_session(commit)
+            objects = session.get_session_objects()
+            pred_hits = []
+            # ASK: Rankobjects or RankChanged?
+            for pred_o, pred_doi in (mip[i].rankObjects(session.user)):
+                if pred_o in objects:
+                    score[-1] += pred_doi
+                    pred_hits.append(1)
+                else:
+                    pred_hits.append(0)
 
+            top_10 = sum(pred_hits[:10]) if len(pred_hits) >= 10 else -1
+            top_5 = sum(pred_hits[:5]) if len(pred_hits) >= 5 else -1
+            top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else -1
+            t.add_row([session.user, score[-1], top_3, top_5, top_10])
+            mip[i].updateMIP(session)
+        verbose_print(t)
+        verbose_print(f"score for repo is: {score[-1]}")
 
-
-
-    return 0.0
+    total = sum(score)
+    verbose_print(f"--------------score is: {total}-------------------\n")
+    return -total
 
 
 if __name__ == "__main__":
-    #ASK: we can't evaluate for different k, need k=1 every time.
+    # ASK: we can't evaluate for different k, need k=1 every time.
     p = Provider(0.8)
 
     mip_models = []
@@ -31,16 +57,10 @@ if __name__ == "__main__":
         mip_models.append(Mip(f"{repo.name}"))
         csr_models.append(CsrFiles())
         for commit in repo:
-            session = Session(commit.author.name, commit.date_str)
-            for action in csr_models[-1].apply_changes_from_commit(commit):
-                session.addAction(action)
-            mip_models[-1].updateMIP(session)
+            mip_models[-1].updateMIP(csr_models[-1].commit_to_session(commit))
 
-    res = []
+    x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))
+    y = list(p.Y)
+    res = minimize(eval_func, x0, (mip_models, csr_models), bounds = Bounds(0, inf))
 
-
-    for i, out_group in enumerate(p.Y):
-        print(f"optimizing for k = {k[i]}:")
-        x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))
-        res.append(minimize(eval_func, x0, (out_group,), bounds=Bounds(0, inf)))
-        print (res[-1])
+    verbose_print(res)

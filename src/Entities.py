@@ -18,6 +18,9 @@ class Session:
     def addAction(self, action):
         self.actions.append(action)
 
+    def get_session_objects(self):
+        return [a.ao for a in self.actions]
+
     def __str__(self):
         toPrint = f"session at time {self.time} user = {self.user}\n"
         for act in self.actions:

@@ -20,7 +20,7 @@ class Mip:
     @:param user_decay, object_decay
     """
 
-    def __init__(self, model_name =None, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0, similarityMetric="adamic"):
+    def __init__(self, model_name=None, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0, similarityMetric="adamic"):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
@@ -31,7 +31,7 @@ class Mip:
         self.name = model_name
         # ASK: what if we want real apriuti info? for example, the head node that need to be on top every time - move to CSR
         self.centrality = None
-        self.set_params(alpha,beta,gamma,user_decay,object_decay, similarityMetric)
+        self.set_params(alpha, beta, gamma, user_decay, object_decay, similarityMetric)
 
     def set_params(self, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0, similarityMetric="adamic"):
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
@@ -146,8 +146,10 @@ class Mip:
         proximity = 0.0
         for node in nx.common_neighbors(self.mip, s, t):
             weights = self.mip[s][node]['weight'] + self.mip[t][node]['weight']  # the weight of the path connecting s and t through the current node
-            if weights != 0:  # 0 essentially means no connection
-                proximity += weights * 1 / math.log(self.mip.degree(node, weight='weight'))  # gives more weight to "rare" shared neighbors
+            total_rank = self.mip.degree(node, weight='weight')
+            if weights != 0 and total_rank != 1:  # 0 essentially means no connection
+                # ASK: need to be inf if 1? bu-g here in the original formula: proximity += (weights*(1/(math.log(self.mip.degree(node, weight = 'weight'))+0.00000000000000000000000001)))
+                proximity += weights * 1 / math.log(total_rank)  # gives more weight to "rare" shared neighbors
         return proximity
 
     def simpleProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
@@ -214,30 +216,18 @@ class Mip:
 
         revs = self.mip.node[aoNode]['revisions']
         numOfChanges = len(revs) - revs.index(fromRevision)
-        return numOfChanges / float(self.iteration - fromRevision)
+        return 0.0 if self.iteration == fromRevision \
+            else numOfChanges / float(self.iteration - fromRevision)
 
     def rankObjects(self, user):
-        if user not in self.users:
-            print("this is a new user! getting default rankings")
-            user = None  # will return the objects sorted by cenrality.
-
         tupledAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao)) \
-                     for ao in self.getLiveAos(user))
+                     for ao in self.getLiveAos())
         return sorted(tupledAos, key=lambda x: x[1], reverse=True)
 
-    def rankChanged(self, user, time=None):
-        if user not in self.users:
-            print("this is a new user! getting default ranking")
-            user = None
-        else:
-            userNode = self.users[user]
-            if time is None:
-                time = self.mip.node[userNode]['last_visit']
-
-        changedAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao))
-                      for ao in self.getLiveAos(user) if self.mip.node[ao]['revisions'][-1] > time)
-        return sorted(changedAos, key=lambda x: x[1], reverse=True)
-
+    def rankChanged(self, user, time=-1):
+        if user in self.users and time == -1:
+            time = self.mip.node[self.users[user]]['last_visit']
+        return filter(lambda ao: self.mip.node[ao[0]]['revisions'][-1] > time, self.rankObjects(user))
     '''
     -----------------------------------------------------------------------------
     MIPs reasoning functions end

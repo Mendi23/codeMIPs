@@ -10,7 +10,7 @@ class Repo:
         self.name = name
 
     def __iter__(self):
-        return self.gen
+        return iter(self.gen)
 
 class Provider:
     def __init__(self, ratio):
@@ -46,7 +46,7 @@ class Provider:
         return Repo(repo, ttgen)
 
     def _getTest(self, repo):
-        return Repo(repo, self._super_generators[repo])
+        return Repo(repo, list(self._super_generators[repo]))
 
 
 if __name__ == '__main__':

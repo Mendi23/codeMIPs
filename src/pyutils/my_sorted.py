@@ -15,3 +15,6 @@ class MySorted:
 
     def append(self, val):
         self.elements.append(val)
+
+    def __len__(self):
+        return len(self.elements)

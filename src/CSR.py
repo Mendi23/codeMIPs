@@ -8,7 +8,7 @@ import json
 
 import networkx as nx
 from pyutils import hashing
-from Entities import Action
+from Entities import Action, Session
 
 import DataModule.models as Models
 
@@ -18,7 +18,9 @@ class CsrFiles:
         self.csr = nx.Graph()
         self.mapping = hashing.MagicHash()
 
-    def apply_changes_from_commit(self, commit: Models.Commit):
+    def commit_to_session(self, commit: Models.Commit):
+        session = Session(commit.author.name, commit.date_str)
+
         file: Models.FileChangeset = None  # for autocorrect
         for file in commit.files:
             if file.changetype == Models.ChangeEnum.ADDED:
@@ -41,7 +43,34 @@ class CsrFiles:
             else:
                 raise ValueError(f"Unknown file status: {str(file)}")
 
-            yield Action(objId, status)
+            session.addAction(Action(objId, status))
+
+        return session
+
+    # def apply_changes_from_commit(self, commit: Models.Commit):
+    #     file: Models.FileChangeset = None  # for autocorrect
+    #     for file in commit.files:
+    #         if file.changetype == Models.ChangeEnum.ADDED:
+    #             status = "added"
+    #             objId = self.mapping[file.target]
+    #
+    #         elif file.changetype == Models.ChangeEnum.MODIFIED:
+    #             status = "modified"
+    #             objId = self.mapping[file.target]
+    #
+    #         elif file.changetype == Models.ChangeEnum.RENAMED:
+    #             self.mapping.rename(file.source, file.target)
+    #             status = "renamed"
+    #             objId = self.mapping[file.target]
+    #
+    #         elif file.changetype == Models.ChangeEnum.DELETED:
+    #             status = "removed"
+    #             objId = self.mapping.pop(file.source)
+    #
+    #         else:
+    #             raise ValueError(f"Unknown file status: {str(file)}")
+    #
+    #         yield Action(objId, status)
 
 class CsrCode:
     def __init__(self):
