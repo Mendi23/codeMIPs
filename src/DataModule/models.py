@@ -160,11 +160,13 @@ class Patch(Base):
         d = super().serialize()
         # d["source_lines"] = []
         # d["target_lines"] = []
+        # return d
         d["source_lines"] = _encode_string(json.dumps(self.source_lines))
         d["target_lines"] = _encode_string(json.dumps(self.target_lines))
         return d
 
     def _hooks(self):
-        # return
+        self.source_lines = self.target_lines = ""
+        return
         self.source_lines = json.loads(_decode_string(self.source_lines))
         self.target_lines = json.loads(_decode_string(self.target_lines))
