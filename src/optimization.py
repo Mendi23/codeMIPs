@@ -1,3 +1,5 @@
+import itertools
+
 from scipy.optimize import minimize, Bounds
 from src.MIP import Mip
 from numpy import array, inf
@@ -5,7 +7,6 @@ from CSR import CsrFiles
 from Factory import Provider
 from copy import deepcopy
 from prettytable import PrettyTable as pt
-import tracemalloc as tm
 
 def verbose_print(s):
     pass#print(s)
@@ -44,8 +45,17 @@ def eval_func(x, *args) -> float:
     return -total
 
 
+def blallllll():
+    snapshot = tm.take_snapshot()
+    top_stats = snapshot.statistics('traceback')[:5]
+    print("-" * 40)
+    print("stats:")
+    for stat in top_stats:
+        print(stat.traceback.format())
+    print("-" * 40)
+
+
 if __name__ == "__main__":
-    tm.start()
     p = Provider(0.8)
 
     mip_models = []
@@ -55,12 +65,6 @@ if __name__ == "__main__":
         mip_models.append(Mip(f"{repo.name}"))
         csr_models.append(CsrFiles())
         for commit in repo:
-            snapshot = tm.take_snapshot()
-            top_stats = snapshot.statistics('lineno')
-            print("[ Top 10 ]")
-            for stat in top_stats[:5]:
-                print(stat)
-
             mip_models[-1].updateMIP(csr_models[-1].commit_to_session(commit))
 
     x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))
