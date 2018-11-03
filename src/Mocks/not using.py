@@ -3,19 +3,13 @@ import networkx as nx
 
 g = nx.Graph()
 g.add_path(['a','b','c'])
-
-for j in g.edges_iter('a', data=True):
-    j[2]["aa"]=5
-
-t = list(g.edges_iter(['a'], data=True))
-print (t)
-t[0][2]["hfj"] = 0
-
-print(g['a'])
-
-g.node['a']['xx'] = 5
-t = g.node['a']
-t['dfgf'] = 7
-print(g.node['a'])
-print(g.node['b'])
-print(list(g.nodes_iter()))
+g.add_node(1, time='5pm')
+print(g.nodes) # just keys
+print(g.nodes[1]) #just data
+print((g.neighbors('b'))) # just keys
+x = g.nodes[1]
+x['col'] = 'red'
+print(g.nodes[1]) # col also appear
+print(g.nodes.data()) #tuple of (node, data)
+print(g['b']) #tuple of (node, data) in neighbours
+print(g.edges(['a','b'], data=True))

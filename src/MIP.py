@@ -10,6 +10,8 @@ from itertools import combinations
 from pyutils.my_sorted import MySorted
 import networkx as nx
 import math
+import matplotlib.pyplot as plt
+
 
 # ASK: our proxy method for evaluation isn't good enough
 
@@ -48,12 +50,10 @@ class Mip:
         else:
             raise ValueError('Didn\'t define a valid similarity metric')
 
-    def getLiveAos(self, user=None, data=False):
-        # generator of mip nodes that represent live object
-        nodes = self.mip.nodes_iter(data=True) if user is None else \
-            ((n, self.mip.node[n]) for n in self.mip.neighbors_iter(self.users[user]))
-        liveNodes = ((n, att) for n, att in nodes if att['node_type'] == 'object' and not att['deleted'])
-        yield from liveNodes if data else (n for n, _ in liveNodes)
+    def getLiveAos(self, user=None):
+    # list of mip nodes that represent live object
+        nodes = self.mip.nodes if user is None else self.mip.neighbors(user)
+        return [n for n in nodes if self.mip.nodes[n]['node_type'] == 'object']
 
     def addUser(self, user_name):
         if user_name not in self.users:
@@ -85,13 +85,13 @@ class Mip:
         self.centrality = None
         user = session.user
         user_node = self.addUser(user)
-        user_att = self.mip.node[user_node]
+        user_att = self.mip.nodes[user_node]
         user_att['last_visit'] = self.iteration
 
         changedAOs = list()
         for act in session.actions:
             ao_node = self.addObject(act.ao)
-            ao_att = self.mip.node[ao_node]
+            ao_att = self.mip.nodes[ao_node]
             # ASK: why do we need deleted and what to do if actualy deleted?
             # ASK: plus, right now is considering deleted for determening interest etc. can we use it?
             ao_att['deleted'] = False
@@ -103,7 +103,7 @@ class Mip:
             changedAOs.append(ao_node)
             self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc + self.userDecay)
 
-        for n in self.getLiveAos(user):
+        for n in self.getLiveAos(user_node):
             self.mip[user_node][n]['weight'] = max(0, self.mip[user_node][n]['weight'] - self.userDecay)
 
         # ASK: why do we need both increment between objects and decay for all others?
@@ -113,7 +113,7 @@ class Mip:
         for node1, node2 in combinations(changedAOs, 2):
             self.updateEdge(node1, node2, 'ao-ao', 1.0 + self.objectDecay)
 
-        for _, _, att in self.mip.edges_iter(changedAOs, data=True):
+        for _, _, att in self.mip.edges(changedAOs, data=True):
             if att['edge_type'] == 'ao-ao':
                 att['weight'] = max(0, att['weight'] - self.objectDecay)
 
@@ -126,7 +126,7 @@ class Mip:
                     'weight': increment,
                     'lastKnown': self.iteration,
                     }
-            self.mip.add_edge(i1, i2, attr)
+            self.mip.add_edge(i1, i2, **attr)
 
     '''
     -----------------------------------------------------------------------------
@@ -213,7 +213,7 @@ class Mip:
             userNode = self.users[userId]
             fromRevision = self.mip[userNode][aoNode]['lastKnown']  # get the last time the user knew what the value of the object was
 
-        revs = self.mip.node[aoNode]['revisions']
+        revs = self.mip.nodes[aoNode]['revisions']
         numOfChanges = len(revs) - revs.index(fromRevision)
         return 0.0 if self.iteration == fromRevision \
             else numOfChanges / float(self.iteration - fromRevision)
@@ -225,13 +225,18 @@ class Mip:
 
     def rankChanged(self, user, time=-1):
         if user in self.users and time == -1:
-            time = self.mip.node[self.users[user]]['last_visit']
-        return filter(lambda ao: self.mip.node[ao[0]]['revisions'][-1] > time, self.rankObjects(user))
+            time = self.mip.nodes[self.users[user]]['last_visit']
+        return filter(lambda ao: self.mip.nodes[ao[0]]['revisions'][-1] > time, self.rankObjects(user))
+
     '''
     -----------------------------------------------------------------------------
     MIPs reasoning functions end
     -----------------------------------------------------------------------------
     '''
+
+    def drawMip(self):
+        nx.draw(self.mip)
+        plt.savefig("path.png")
 
     def __str__(self):
         return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}"

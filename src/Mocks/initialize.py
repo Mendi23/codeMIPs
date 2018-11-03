@@ -13,10 +13,10 @@ if __name__ == "__main__":
         mip.updateMIP(csr.commit_to_session(commit))
 
     t = pt(['user', 'score', 'top 3', 'top 5', 'top 10', 'all'])
+    mip.drawMip()
     for commit in p.Y:
         session = csr.commit_to_session(commit)
         print(session)
-        print("\n")
         objects = set(session.get_session_objects())
         pred_hits = []
         score = 0.0
@@ -31,7 +31,12 @@ if __name__ == "__main__":
         top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else -1
         top_all = sum(pred_hits)
         t.add_row([session.user.split('@', 1)[0], score, top_3, top_5, top_10, top_all])
+        # urielha 10
+        # 7 8
+        print(mip.mip.get_edge_data(10,8))
+        print(f"predicted: {pred_hits}")
         mip.updateMIP(session)
+        print("\n")
     print(t)
 
 
