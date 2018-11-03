@@ -15,6 +15,8 @@ if __name__ == "__main__":
     t = pt(['user', 'score', 'top 3', 'top 5', 'top 10', 'all'])
     for commit in p.Y:
         session = csr.commit_to_session(commit)
+        print(session)
+        print("\n")
         objects = set(session.get_session_objects())
         pred_hits = []
         score = 0.0

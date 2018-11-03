@@ -27,7 +27,7 @@ class Session:
     def __str__(self):
         toPrint = f"session at time {self.time} user = {self.user}\n"
         for act in self.actions:
-            toPrint = toPrint + act + "\n"
+            toPrint = toPrint + str(act) + "\n"
         return toPrint
 
 
