@@ -1,25 +1,35 @@
-from DataModule.DataQuery import DataExtractor
-from MIP import Mip
-from Entities import Session
-from CSR import Csr
-from pyutils.file_paths import STORAGE_DIR
+from src.MIP import Mip
+from CSR import CsrFiles
+from Factory import Provider
+from prettytable import PrettyTable as pt
 
 
-def main(repo_path):
-    git = DataExtractor(STORAGE_DIR)
-    graph = Mip()
-    codeGraph = Csr()
+if __name__ == "__main__":
 
-    for commit in git.get_train_test_generator(repo_path):
-        session = Session(commit.author.name, commit.date_str)
-        for a in codeGraph.apply_changes_from_commit(commit):
-            session.addAction(a)
-        graph.updateMIP(session)
+    mip = Mip()
+    csr = CsrFiles()
+    p = Provider(0.8, "urielha/heapdict")
+    for commit in p.X:
+        mip.updateMIP(csr.commit_to_session(commit))
+
+    t = pt(['user', 'score', 'top 3', 'top 5', 'top 10', 'all'])
+    for commit in p.Y:
+        session = csr.commit_to_session(commit)
+        objects = set(session.get_session_objects())
+        pred_hits = []
+        score = 0.0
+        for pred_o, pred_doi in mip.rankObjects(session.user):
+            if pred_o in objects:
+                score += pred_doi
+                pred_hits.append(1)
+            else:
+                pred_hits.append(0)
+        top_10 = sum(pred_hits[:10]) if len(pred_hits) >= 10 else -1
+        top_5 = sum(pred_hits[:5]) if len(pred_hits) >= 5 else -1
+        top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else -1
+        top_all = sum(pred_hits)
+        t.add_row([session.user.split('@', 1)[0], score, top_3, top_5, top_10, top_all])
+        mip.updateMIP(session)
+    print(t)
 
 
-    for id, _ in graph.rankObjects("Uriel Hai"):
-        print(codeGraph.mapping[id])
-
-
-if __name__ == '__main__':
-    main("urielha/heapdict")

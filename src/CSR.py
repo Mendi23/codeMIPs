@@ -4,7 +4,6 @@ Created on Aug 17, 2018
 @authors: Uriel, Mendi
 """
 import functools
-import json
 
 import networkx as nx
 from pyutils import hashing
@@ -38,6 +37,7 @@ class CsrFiles:
 
             elif file.changetype == Models.ChangeEnum.DELETED:
                 status = "removed"
+                #TODO: Not good if re-instated
                 objId = self.mapping.pop(file.source)
 
             else:

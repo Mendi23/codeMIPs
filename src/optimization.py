@@ -5,10 +5,10 @@ from CSR import CsrFiles
 from Factory import Provider
 from copy import deepcopy
 from prettytable import PrettyTable as pt
-
+import tracemalloc as tm
 
 def verbose_print(s):
-    print(s)
+    pass#print(s)
 
 
 def eval_func(x, *args) -> float:
@@ -26,7 +26,7 @@ def eval_func(x, *args) -> float:
             objects = set(session.get_session_objects())
             pred_hits = []
             # ASK: Rankobjects or RankChanged?
-            for order, (pred_o, pred_doi) in enumerate(mip[i].rankObjects(session.user), 1):
+            for pred_o, pred_doi in mip[i].rankObjects(session.user):
                 if pred_o in objects:
                     score[-1] += pred_doi
                     pred_hits.append(1)
@@ -47,6 +47,7 @@ def eval_func(x, *args) -> float:
 
 
 if __name__ == "__main__":
+    tm.start()
     # ASK: we can't evaluate for different k, need k=1 every time.
     p = Provider(0.8)
 
@@ -57,6 +58,12 @@ if __name__ == "__main__":
         mip_models.append(Mip(f"{repo.name}"))
         csr_models.append(CsrFiles())
         for commit in repo:
+            snapshot = tm.take_snapshot()
+            top_stats = snapshot.statistics('lineno')
+            print("[ Top 10 ]")
+            for stat in top_stats[:5]:
+                print(stat)
+
             mip_models[-1].updateMIP(csr_models[-1].commit_to_session(commit))
 
     x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))

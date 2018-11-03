@@ -12,13 +12,16 @@ class Session:
     def __init__(self, user, time, sessionWeight = 1.0):
         self.actions = []
         self.user = user
-        self.time = time
+        self.time = time # Currently not used
         self.sessionWeight = sessionWeight
 
     def addAction(self, action):
         self.actions.append(action)
 
     def get_session_objects(self):
+        '''
+        :return: a list of object's modified in the session
+        '''
         return [a.ao for a in self.actions]
 
     def __str__(self):
@@ -33,7 +36,7 @@ class Action:
         self.ao = ao
         self.actType = actType  # view, edit, add, delete
         self.weightInc = weightInc
-        self.mipNodeID = None
+        self.mipNodeID = None # currently not aware of the mip node
 
     def __repr__(self):
         return f"< ao = {self.ao}, actType = {self.actType}, weightInc = {self.weightInc}, mipNodeID= {self.mipNodeID} >"

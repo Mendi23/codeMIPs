@@ -11,7 +11,6 @@ from pyutils.my_sorted import MySorted
 import networkx as nx
 import math
 
-
 # ASK: our proxy method for evaluation isn't good enough
 
 class Mip:
