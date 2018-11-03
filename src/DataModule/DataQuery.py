@@ -87,13 +87,23 @@ class GithubQuery:
     def num_of_commits(self):
         return self.repo.branches.master.commit.count(first_parent=True)
 
-    def repo_iterate_commits(self) -> Iterator[Commit]:
+    def repo_iterate_commits(self, until=None, start_from=None) -> Iterator[Commit]:
         """
         Iterate over commits in "master" from the first (oldest) commit
         to the last.
         Excluding forks to other branches.
+        :param until - index from the END (i.e. until=1 is until 1 before the end)
+        :param start_from - index from the END
         """
-        return self.repo.iter_commits(MASTER,
+        assert until is None or start_from is None, "can't have both `until` and `start_from` set with value"
+
+        branch = MASTER
+        if until is not None:
+            branch = f"{MASTER}~{until}"
+        elif start_from is not None:
+            branch = f"{MASTER}~{start_from}..{MASTER}"
+
+        return self.repo.iter_commits(branch,
                                       first_parent=True,
                                       reverse=True)
 
@@ -123,36 +133,53 @@ class DataExtractor:
         self.storagedir = Storage.init_save_dir(self.gitdir + "_cache")
         self.repouri = repouri
 
-    def get_train_test_generator(self) -> Gen[Models.Commit]:
-        self.query = query = GithubQuery.create(self.gitdir, self.repouri)
+        self.query = GithubQuery.create(self.gitdir, self.repouri)
+
+        self.num_of_commits = self.query.num_of_commits()
+        self.first_slice = int(self.num_of_commits * self.ratio)
+        if self.k_commits > 0:
+            assert self.num_of_commits > self.k_commits, \
+                f"Asked to slice {self.k_commits} commits but got only total of {self.num_of_commits} commits."
+            self.first_slice = self.num_of_commits - self.k_commits
+
+    def initialize_repo_storage(self, suffix=''):
         jsons_filename = pathjoin(self.storagedir,
-                                  Storage.get_valid_filename(self.repouri))
+                                  Storage.get_valid_filename(self.repouri + suffix))
+
         jsons_export = Storage.export_object_to_json_file
         jsons_import = functools.partial(Storage.import_objects_from_json_file,
                                          decoder=Models.Commit.create)
         # noinspection PyTypeChecker
-        self.storage = Storage(jsons_filename, PER_PAGE, jsons_export, jsons_import)
+        storage = Storage(jsons_filename, PER_PAGE, jsons_export, jsons_import)
+        return storage
 
-        num_of_commits = query.num_of_commits()
-        first_slice = int(num_of_commits * self.ratio)
-        if self.k_commits > 0:
-            assert num_of_commits > self.k_commits, \
-                f"Asked to slice {self.k_commits} commits but got only total of {num_of_commits} commits."
-            first_slice = num_of_commits - self.k_commits
+    def get_train_test_generator(self) -> Gen[Models.Commit]:
+        storage = self.initialize_repo_storage()
+        return Gen(self.first_slice, self._iterate_commits(storage))
 
-        return Gen(first_slice, self._iterate_commits(query))
+    def get_train(self) -> Iterable[Models.Commit]:
+        storage = self.initialize_repo_storage()
+        until = self.num_of_commits - self.first_slice
+        return self._iterate_commits(storage, until=until)
 
-    def load_commits(self):
-        return self.storage.load_all()
+    def get_test(self) -> Iterable[Models.Commit]:
+        storage = self.initialize_repo_storage("_test")
+        start_from = self.num_of_commits - self.first_slice
+        return self._iterate_commits(storage, start_from=start_from)
 
-    def _iterate_commits(self, query: GithubQuery):
+    def load_commits(self, storage: Storage):
+        return storage.load_all()
+
+    def _iterate_commits(self, storage: Storage, until=None, start_from=None):
+        query: GithubQuery = self.query
+
         if CACHE_THE_DATA_MF:
-            yield from self.load_commits()
-        skip_n = self.storage.objects_count
+            yield from self.load_commits(storage)
+        skip_n = storage.objects_count
         if skip_n > 0:
             print("SOME OF THE DATA WERE LOADED FROM CACHE!")
 
-        for i, commit in enumerate(query.repo_iterate_commits()):
+        for i, commit in enumerate(query.repo_iterate_commits(until, start_from)):
             if i < skip_n: continue
 
             cobj = self._create_commit(commit)
@@ -176,11 +203,11 @@ class DataExtractor:
             cobj.files.sort()  # place "RENAME" before others
 
             if CACHE_THE_DATA_MF:
-                self.storage.save_obj(cobj)
+                storage.save_obj(cobj)
             yield cobj
         ### END
 
-        self.storage.dispose()
+        storage.dispose()
 
     def _create_commit(self, commit) -> Models.Commit:
         cobj = Models.Commit()
@@ -248,7 +275,7 @@ class DataExtractor:
 
 
 if __name__ == "__main__":
-    for source in KNOWN_SMALL_REPOS[:2]:
+    for source in ["urielha/heapdict"]:
         de = DataExtractor(STORAGE_DIR, source)
         gen = de.get_train_test_generator()
         i = itertools.count(1)
@@ -266,6 +293,6 @@ if __name__ == "__main__":
 
         if CACHE_THE_DATA_MF:
             print("load:")
-            commits = list(de.load_commits())
+            commits = list(de.load_commits(de.initialize_repo_storage()))
             print(len(commits))
             print(commits[0])
