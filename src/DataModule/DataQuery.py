@@ -73,15 +73,15 @@ class GithubQuery:
         ret.uri = urljoin(BASE_URL, repouri)
         ret.storage = pathjoin(storage, repouri)
         if os.path.exists(ret.storage):
-            print(f"load existing repo: {repouri}..")
+            print(f"[DataQuery] - load existing repo: {repouri}..")
             ret.repo = Repo(ret.storage)
         else:
-            print(f"cloning repo: {repouri}..")
+            print(f"[DataQuery] - cloning repo: {repouri}..")
             ret.repo = Repo.clone_from(ret.uri, ret.storage, bare=True)
 
-        print("fetch..")
+        print("[DataQuery] - fetch..")
         ret.repo.remotes.origin.fetch(MASTER)
-        print("ready!")
+        print("[DataQuery] - ready!")
         return ret
 
     def num_of_commits(self):
@@ -141,6 +141,8 @@ class DataExtractor:
             assert self.num_of_commits > self.k_commits, \
                 f"Asked to slice {self.k_commits} commits but got only total of {self.num_of_commits} commits."
             self.first_slice = self.num_of_commits - self.k_commits
+
+        print(f"[DataQuery] - Repo: {repouri}, commits: {self.num_of_commits}, train slice: {self.first_slice}")
 
     def initialize_repo_storage(self, suffix=''):
         jsons_filename = pathjoin(self.storagedir,

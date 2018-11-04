@@ -50,12 +50,10 @@ if __name__ == "__main__":
     csr_models = []
 
     for repo in p.X:
-        print(f"repo: {repo}")
         mip_models.append(Mip(f"{repo.name}"))
         csr_models.append(CsrFiles())
         for commit in repo:
-            print("  commit - " + commit.sha)
-            print(f"    contains {len(commit.files)} files")
+            print(f"    files: {len(commit.files)}")
             mip_models[-1].updateMIP(csr_models[-1].commit_to_session(commit))
 
     x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))

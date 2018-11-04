@@ -6,14 +6,15 @@ Created on Jun 7, 2015
 Edited: Aug-Sep, 2018
 @editors: Uriel, Mendi
 '''
-from itertools import permutations, count
+from itertools import permutations
+
+from DataModule.models import ChangeEnum
 from pyutils.my_sorted import MySorted
 import networkx as nx
 import math
 import matplotlib.pyplot as plt
-import psutil, os
 
-CHANGED_THRESHOLD = 2000
+CHANGED_THRESHOLD = math.inf
 OBJECT_DECAY = 1.0
 USER_DECAY = 1.0
 GAMMA = 0.2
@@ -40,9 +41,6 @@ class Mip:
         self.centrality = None
 
         self.set_params(alpha, beta, gamma, user_decay, object_decay, changed_threshold)
-        self._process = psutil.Process(os.getpid())
-        self._update_mip = 0
-        self._update_edge = 0
 
     def set_params(self, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY, changed_threshold=CHANGED_THRESHOLD):
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
@@ -89,7 +87,6 @@ class Mip:
         return self.users[id]
 
     def updateMIP(self, session):
-        self._update_mip += 1
         print(f"     [updateMIP] actions: {len(session.actions)}")
 
         self.iteration += 1
@@ -103,7 +100,7 @@ class Mip:
         for act in session.actions:
             ao_node = self._addObject(act.ao)
             ao_att = self.mip.nodes[ao_node]
-            ao_att['deleted'] = (act.actType == 'delete')  # label deleted objects as deleted
+            ao_att['deleted'] = (act.actType == ChangeEnum.DELETED)  # label deleted objects as deleted
 
             assert ao_node not in changedAOs, "assuming only one action per object in one session"
             ao_att['revisions'].append(self.iteration)  # add revision.
@@ -129,7 +126,6 @@ class Mip:
                     self.mip.remove_node(n)  # if an object is deleted and weight of all connected edges is 0 - delete the node from graph
 
     def updateEdge(self, i1, i2, edge_type, increment=1.0):
-        self._update_edge += 1
         if self.mip.has_edge(i1, i2):
             self.mip[i1][i2]['weight'] += increment
             self.mip[i1][i2]['lastKnown'] = self.iteration  # update last time user knew about object
@@ -139,12 +135,6 @@ class Mip:
                     'lastKnown': self.iteration,
                     }
             self.mip.add_edge(i1, i2, **attr)
-
-        mb = self._process.memory_info().vms // (1<<20)
-        if mb > 1200:
-            print(f"current mem: {mb} exiting...")
-            print(f"update_edge, update_mip = ({self._update_edge}, {self._update_mip})")
-            raise MemoryError("bye bye")
 
 
     def simpleProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids

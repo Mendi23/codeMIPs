@@ -140,6 +140,13 @@ class FileChangeset(Base):
         return self.changetype != other.changetype and \
                self.changetype == ChangeEnum.RENAMED
 
+    @property
+    def filename(self):
+        if self.changetype == ChangeEnum.DELETED:
+            return self.source
+        else:
+            return self.target
+
     def serialize(self):
         d = super().serialize()
         d["changetype"] = self.changetype.name

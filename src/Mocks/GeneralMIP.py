@@ -20,6 +20,9 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
 
+from DataModule.models import ChangeEnum
+
+
 class Mip:
     def __init__(self, ao_inc=1, decay=0.2):
         self.mip = nx.Graph()
@@ -52,8 +55,8 @@ class Mip:
             ao_node = self.objects[ao]
             self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)
             # label deleted objects as deleted
-            if act.actType == 'delete':
-                self.mip.node[self.objects[act.ao]]['deleted'] = 1
+            if act.actType == ChangeEnum.DELETED:
+                self.mip.nodes[self.objects[act.ao]]['deleted'] = 1
 
         for i in range(len(session.actions)):
             ao_node1 = self.objects[session.actions[i].ao]
