@@ -22,31 +22,6 @@ ORIGIN = "origin"
 MASTER = "master"
 BASE_URL = "https://github.com"
 
-KNOWN_SMALL_REPOS = [
-    "urielha/SimpleObjectAppender",
-    "urielha/log4stash",
-    "Microsoft/DirectXShaderCompiler",
-    "fragglet/c-algorithms",
-    "TheAlgorithms/C-Plus-Plus",
-    "TheAlgorithms/C",
-    "nlohmann/json",
-    "stedolan/jq",
-    "mozilla/DeepSpeech",
-    "Alexpux/mingw-w64",
-]
-KNOWN_BIG_REPOS = [
-    "torvalds/linux",
-    "videolan/vlc",
-    "tensorflow/tensorflow",
-    "nginx/nginx",
-    "electron/electron",
-    "bitcoin/bitcoin",
-    "google/protobuf",
-    "mozilla/rr",
-    "mozilla/gecko-dev",
-    "Microsoft/ELL",
-]
-
 
 class GithubQuery:
     """
@@ -275,26 +250,3 @@ class DataExtractor:
             patch.section_header = inner.section_header
             patches.append(patch)
 
-
-if __name__ == "__main__":
-    for source in ["urielha/heapdict"]:
-        de = DataExtractor(STORAGE_DIR, source)
-        gen = de.get_train_test_generator()
-        i = itertools.count(1)
-
-        print(de.query.num_of_commits())
-        print("train: " + str(len(list(gen))))
-        # for i, commit in gen:
-        #     print(f"{i:03}: {commit.hexsha}")
-        #     print(f"1 [{next(i):02}]- {commit.sha}: {commit.date_str}")
-
-        print("test: " + str(len(list(gen))))
-        # for i, commit in gen:
-        #     print(f"{i:03}: {commit.hexsha}")
-        #     print(f"2 [{next(i):02}]- {commit.sha}: {commit.date_str}")
-
-        if CACHE_THE_DATA_MF:
-            print("load:")
-            commits = list(de.load_commits(de.initialize_repo_storage()))
-            print(len(commits))
-            print(commits[0])

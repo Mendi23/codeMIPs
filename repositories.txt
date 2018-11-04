@@ -1,6 +1,6 @@
-# urielha/heapdict
-# urielha/SimpleObjectAppender
-# _local_/CodeMIPs
+urielha/heapdict
+urielha/SimpleObjectAppender
+_local_/CodeMIPs
 
 
 # TheAlgorithms/C-Plus-Plus
@@ -8,18 +8,23 @@
 # fragglet/c-algorithms
 # nlohmann/json
 # stedolan/jq
+
+## MED SIZE:
 # Microsoft/DirectXShaderCompiler
 # mozilla/DeepSpeech
 # Alexpux/mingw-w64
+# nodemcu/nodemcu-firmware
+# Microsoft/ELL
+# mozilla/rr
 
 ## BIG REPOSITORIES:
+# vim/vim
 # videolan/vlc
 # tensorflow/tensorflow
 # nginx/nginx
 # electron/electron
 # bitcoin/bitcoin
 # google/protobuf
-# mozilla/rr
 # mozilla/gecko-dev
-# Microsoft/ELL
 # torvalds/linux
+# kripken/emscripten
