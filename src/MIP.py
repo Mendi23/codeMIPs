@@ -6,12 +6,19 @@ Created on Jun 7, 2015
 Edited: Aug-Sep, 2018
 @editors: Uriel, Mendi
 '''
-from itertools import permutations
+from itertools import permutations, count
 from pyutils.my_sorted import MySorted
 import networkx as nx
 import math
 import matplotlib.pyplot as plt
+import psutil, os
 
+CHANGED_THRESHOLD = 2000
+OBJECT_DECAY = 1.0
+USER_DECAY = 1.0
+GAMMA = 0.2
+BETA = 0.6
+ALPHA = 0.2
 
 class Mip:
     """
@@ -20,7 +27,7 @@ class Mip:
     @:param user_decay, object_decay
     """
 
-    def __init__(self, model_name=None, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0):
+    def __init__(self, model_name=None, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY, changed_threshold=CHANGED_THRESHOLD):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
@@ -32,14 +39,18 @@ class Mip:
         self.name = model_name  # for referencing
         self.centrality = None
 
-        self.set_params(alpha, beta, gamma, user_decay, object_decay)
+        self.set_params(alpha, beta, gamma, user_decay, object_decay, changed_threshold)
+        self._process = psutil.Process(os.getpid())
+        self._update_mip = 0
+        self._update_edge = 0
 
-    def set_params(self, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0):
+    def set_params(self, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY, changed_threshold=CHANGED_THRESHOLD):
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
         self.beta = beta  # weight given to the proximity between the user and the object
         self.gamma = gamma  # weight given to the extent of change
         self.userDecay = user_decay
         self.objectDecay = object_decay
+        self.changed_threshold = changed_threshold
 
     def getLiveAos(self, userID=None):
         """
@@ -78,6 +89,9 @@ class Mip:
         return self.users[id]
 
     def updateMIP(self, session):
+        self._update_mip += 1
+        print(f"     [updateMIP] actions: {len(session.actions)}")
+
         self.iteration += 1
         self.centrality = None
         user = session.user
@@ -97,8 +111,10 @@ class Mip:
             self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)  # adding weights to edge between user and object
 
         # adding weights to edge between two objects that appear in session (total added to : weightInc of both objects)
-        for node1, node2 in permutations(changedAOs, 2):
-            self.updateEdge(node1, node2, 'ao-ao', changedAOs[node1])
+        print(f"     [updateMIP] chanedAOs len: {len(changedAOs)}")
+        if len(changedAOs) < self.changed_threshold:
+            for node1, node2 in permutations(changedAOs, 2):
+                self.updateEdge(node1, node2, 'ao-ao', changedAOs[node1])
 
         # decay for edges between objects that only one of them in session
         for node1, node2, att in self.mip.edges(changedAOs, data=True):
@@ -113,6 +129,7 @@ class Mip:
                     self.mip.remove_node(n)  # if an object is deleted and weight of all connected edges is 0 - delete the node from graph
 
     def updateEdge(self, i1, i2, edge_type, increment=1.0):
+        self._update_edge += 1
         if self.mip.has_edge(i1, i2):
             self.mip[i1][i2]['weight'] += increment
             self.mip[i1][i2]['lastKnown'] = self.iteration  # update last time user knew about object
@@ -122,6 +139,13 @@ class Mip:
                     'lastKnown': self.iteration,
                     }
             self.mip.add_edge(i1, i2, **attr)
+
+        mb = self._process.memory_info().vms // (1<<20)
+        if mb > 1200:
+            print(f"current mem: {mb} exiting...")
+            print(f"update_edge, update_mip = ({self._update_edge}, {self._update_mip})")
+            raise MemoryError("bye bye")
+
 
     def simpleProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
         sharedWeight = 0.0

@@ -11,46 +11,45 @@ from Entities import Action, Session
 
 import DataModule.models as Models
 
+SUPPORTED_FILE_TYPES = {".c", ".h", ".cpp", ".hpp", ".py", ".cs"}
 
 class CsrFiles:
     def __init__(self):
         self.csr = nx.Graph()
-        self.mapping = hashing.MagicHash()
+        self.filesMapping = hashing.MagicHash()
+
+    def getObjectIdByFile(self, file: Models.FileChangeset):
+        if file.changetype == Models.ChangeEnum.ADDED:
+            objId = self.filesMapping[file.target]
+
+        elif file.changetype == Models.ChangeEnum.MODIFIED:
+            objId = self.filesMapping[file.target]
+
+        elif file.changetype == Models.ChangeEnum.RENAMED:
+            self.filesMapping.rename(file.source, file.target)
+            objId = self.filesMapping[file.target]
+
+        elif file.changetype == Models.ChangeEnum.DELETED:
+            objId = self.filesMapping[file.source]
+
+        else:
+            raise ValueError(f"Unknown file status: {str(file)}")
+        return objId
 
     def commit_to_session(self, commit: Models.Commit):
         session = Session(commit.author.email, commit.date_str)
 
-        file: Models.FileChangeset = None  # for autocorrect
         for file in commit.files:
-            if file.changetype == Models.ChangeEnum.ADDED:
-                status = "added"
-                objId = self.mapping[file.target]
-
-            elif file.changetype == Models.ChangeEnum.MODIFIED:
-                status = "modified"
-                objId = self.mapping[file.target]
-
-            elif file.changetype == Models.ChangeEnum.RENAMED:
-                self.mapping.rename(file.source, file.target)
-                status = "renamed"
-                objId = self.mapping[file.target]
-
-            elif file.changetype == Models.ChangeEnum.DELETED:
-                status = "removed"
-                objId = self.mapping[file.source]
-
-            else:
-                raise ValueError(f"Unknown file status: {str(file)}")
-
-            session.addAction(Action(objId, status))
+            objId = self.getObjectIdByFile(file)
+            if file.source.rsplit(".")[-1] in SUPPORTED_FILE_TYPES:
+                session.addAction(Action(objId, file.changetype))
 
         return session
 
 
-class CsrCode:
+class CsrCode(CsrFiles):
     def __init__(self):
-        self.csr = nx.Graph()
-        self.filesMapping = hashing.MagicHash()
+        super().__init__()
         self.functionMapping = hashing.MagicHash()
         self.functionsSet = set()
 
@@ -58,26 +57,8 @@ class CsrCode:
         return f"{file}_->_{func}"
 
     def apply_changes_from_commit(self, commit: Models.Commit):
-        file: Models.FileChangeset = None  # for autocorrect
         for file in commit.files:
-            if file.changetype == Models.ChangeEnum.ADDED:
-                status = 'add'
-                file_id = self.filesMapping[file.target]
-
-            elif file.changetype == Models.ChangeEnum.MODIFIED:
-                status = 'edit'
-                file_id = self.filesMapping[file.target]
-
-            elif file.changetype == Models.ChangeEnum.RENAMED:
-                self.filesMapping.rename(file.source, file.target)
-                status = 'rename'
-                file_id = self.filesMapping[file.target]
-
-            elif file.changetype == Models.ChangeEnum.DELETED:
-                status = 'delete'
-
-            else:
-                raise ValueError(f"Unknown file status: {str(file)}")
+            file_id = self.getObjectIdByFile(file)
 
             functions = set()
             for patch in file.patches:
@@ -85,10 +66,10 @@ class CsrCode:
                 self.functionsSet.add(func_full_name)
 
                 func_id = self.functionMapping[func_full_name]
-                functions.add(Action(func_id, status))
+                functions.add(Action(func_id, file.changetype))
 
-                yield from self.batch_get_functions(file_id, "removed", patch.source_lines)
-                yield from self.batch_get_functions(file_id, "added", patch.target_lines)
+                yield from self.batch_get_functions(file_id, Models.ChangeEnum.DELETED, patch.source_lines)
+                yield from self.batch_get_functions(file_id, Models.ChangeEnum.ADDED, patch.target_lines)
 
             yield from functions
 

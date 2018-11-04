@@ -6,6 +6,9 @@ Created on Jun 11, 2015
 Edited: Aug-Sep, 2018
 @editors: Uriel, Mendi
 '''
+from enum import Enum
+
+from DataModule.models import ChangeEnum
 
 
 class Session:
@@ -30,11 +33,10 @@ class Session:
             toPrint = toPrint + str(act) + "\n"
         return toPrint
 
-
 class Action:
-    def __init__(self, ao, actType, weightInc=1):
+    def __init__(self, ao, actType: ChangeEnum, weightInc=1):
         self.ao = ao
-        self.actType = actType  # rename, edit, add, delete
+        self.actType = actType
         self.weightInc = weightInc
         self.mipNodeID = None # currently not aware of the mip node
 

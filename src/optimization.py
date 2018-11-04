@@ -1,4 +1,3 @@
-import itertools
 
 from scipy.optimize import minimize, Bounds
 from src.MIP import Mip
@@ -44,17 +43,6 @@ def eval_func(x, *args) -> float:
     verbose_print(f"--------------score is: {total}-------------------\n")
     return -total
 
-
-def blallllll():
-    snapshot = tm.take_snapshot()
-    top_stats = snapshot.statistics('traceback')[:5]
-    print("-" * 40)
-    print("stats:")
-    for stat in top_stats:
-        print(stat.traceback.format())
-    print("-" * 40)
-
-
 if __name__ == "__main__":
     p = Provider(0.8)
 
@@ -62,9 +50,12 @@ if __name__ == "__main__":
     csr_models = []
 
     for repo in p.X:
+        print(f"repo: {repo}")
         mip_models.append(Mip(f"{repo.name}"))
         csr_models.append(CsrFiles())
         for commit in repo:
+            print("  commit - " + commit.sha)
+            print(f"    contains {len(commit.files)} files")
             mip_models[-1].updateMIP(csr_models[-1].commit_to_session(commit))
 
     x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))
