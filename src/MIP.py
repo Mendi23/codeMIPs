@@ -87,8 +87,6 @@ class Mip:
         return self.users[id]
 
     def updateMIP(self, session):
-        print(f"     [updateMIP] actions: {len(session.actions)}")
-
         self.iteration += 1
         self.centrality = None
         user = session.user
@@ -108,7 +106,6 @@ class Mip:
             self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)  # adding weights to edge between user and object
 
         # adding weights to edge between two objects that appear in session (total added to : weightInc of both objects)
-        print(f"     [updateMIP] chanedAOs len: {len(changedAOs)}")
         if len(changedAOs) < self.changed_threshold:
             for node1, node2 in permutations(changedAOs, 2):
                 self.updateEdge(node1, node2, 'ao-ao', changedAOs[node1])
@@ -118,12 +115,17 @@ class Mip:
             if att['edge_type'] == 'ao-ao' and (node1 not in changedAOs or node2 not in changedAOs):
                 att['weight'] = max(0, att['weight'] - self.objectDecay)
 
+        to_remove = set()
         for n in self.mip.neighbors(user_node):
             if n not in changedAOs:
                 att = self.mip[user_node][n]
                 att['weight'] = max(0, att['weight'] - self.userDecay)  # decay for objects the user didn't interact with in the session
                 if self.mip.nodes[n]['deleted'] == True and self.mip.degree(n, weight='weight') == 0:
-                    self.mip.remove_node(n)  # if an object is deleted and weight of all connected edges is 0 - delete the node from graph
+                    to_remove.add(n) # if an object is deleted and weight of all connected edges is 0 - delete the node from graph
+
+        if to_remove: print("--------- nodes deleted ------------")
+        for n in to_remove:
+            self.mip.remove_node(n)
 
     def updateEdge(self, i1, i2, edge_type, increment=1.0):
         if self.mip.has_edge(i1, i2):
@@ -141,6 +143,7 @@ class Mip:
         sharedWeight = 0.0
         for node in nx.common_neighbors(self.mip, s, t):
             sharedWeight += self.mip[s][node]['weight'] + self.mip[t][node]['weight']  # the weight of the path connecting s and t through the current node
+        if math.isclose(sharedWeight, 0, ): return 0.0
         return sharedWeight / (self.mip.degree(s, weight='weight') + self.mip.degree(t, weight='weight'))
 
     def DegreeOfInterestMIPs(self, user, obj):

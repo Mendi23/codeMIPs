@@ -30,7 +30,12 @@ class CsrFiles:
                     objId = self.filesMapping[file.target]
 
                 elif file.changetype == Models.ChangeEnum.RENAMED:
-                    self.filesMapping.rename(file.source, file.target)
+                    try:
+                        self.filesMapping.rename(file.source, file.target)
+                    except KeyError:
+                        print(f"! WARNING ! rename file source not found. "
+                              f"{commit.sha}: {file.source}->{file.target}")
+                        raise
                     objId = self.filesMapping[file.target]
 
                 elif file.changetype == Models.ChangeEnum.DELETED:
