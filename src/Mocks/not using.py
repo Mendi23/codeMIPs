@@ -13,3 +13,6 @@ print(g.nodes[1]) # col also appear
 print(g.nodes.data()) #tuple of (node, data)
 print(g['b']) #tuple of (node, data) in neighbours
 print(g.edges(['a','b'], data=True))
+att = g['a']['b']
+att['shade'] = 'black'
+print(g.edges(['a','b'], data=True))

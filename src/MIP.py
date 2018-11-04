@@ -6,56 +6,50 @@ Created on Jun 7, 2015
 Edited: Aug-Sep, 2018
 @editors: Uriel, Mendi
 '''
-from itertools import combinations
+from itertools import permutations
 from pyutils.my_sorted import MySorted
 import networkx as nx
 import math
 import matplotlib.pyplot as plt
 
 
-# ASK: our proxy method for evaluation isn't good enough
-
 class Mip:
     """
-    @:param alpha, beta, gamma
+    @:param model_name (optinal)
+    @:param alpha, beta, gamma - weights for computing distance to object. s.t. alpha+beta+gama = 1
     @:param user_decay, object_decay
     """
 
-    def __init__(self, model_name=None, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0, similarityMetric="adamic"):
+    def __init__(self, model_name=None, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
         self.nodeIDsToObjectsIds = {}  # dictionary mapping between ids of nodes and object ids
         self.nodeIDsToUsersIds = {}  # dictionary mapping between ids of nodes and user ids
-        self.iteration = 0
-        self.lastID = -1
-        self.name = model_name
-        # ASK: what if we want real apriuti info? for example, the head node that need to be on top every time - move to CSR
-        self.centrality = None
-        self.set_params(alpha, beta, gamma, user_decay, object_decay, similarityMetric)
 
-    def set_params(self, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0, similarityMetric="adamic"):
+        self.iteration = 0  # counter for sessions omitted to graph
+        self.lastID = -1  # integer id for nodes
+        self.name = model_name  # for referencing
+        self.centrality = None
+
+        self.set_params(alpha, beta, gamma, user_decay, object_decay)
+
+    def set_params(self, alpha=0.2, beta=0.6, gamma=0.2, user_decay=1.0, object_decay=1.0):
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
         self.beta = beta  # weight given to the proximity between the user and the object
         self.gamma = gamma  # weight given to the extent of change
         self.userDecay = user_decay
         self.objectDecay = object_decay
-        # how to measure proximity/similarity in the newtork
-        if similarityMetric == "edge":
-            self.similarityMetric = self.edgeBasedProximity
-        elif similarityMetric == "adamic":
-            self.similarityMetric = self.adamicAdarProximity
-        elif similarityMetric == "simple":
-            self.similarityMetric = self.simpleProximity
-        else:
-            raise ValueError('Didn\'t define a valid similarity metric')
 
-    def getLiveAos(self, user=None):
-    # list of mip nodes that represent live object
-        nodes = self.mip.nodes if user is None else self.mip.neighbors(user)
-        return [n for n in nodes if self.mip.nodes[n]['node_type'] == 'object']
+    def getLiveAos(self, userID=None):
+        """
+        :param userID: if not none, only return live object connected to that user.
+        :return: list of mip nodes id that represent live object
+        """
+        nodes = self.mip.nodes if userID is None else self.mip.neighbors(userID)
+        return [n for n in nodes if self.mip.nodes[n]['node_type'] == 'object' and self.mip.nodes[n]['deleted'] == False]
 
-    def addUser(self, user_name):
+    def _addUser(self, user_name):
         if user_name not in self.users:
             self.lastID += 1
             self.users[user_name] = self.lastID
@@ -65,7 +59,7 @@ class Mip:
             self.nodeIDsToUsersIds[self.lastID] = user_name
         return self.users[user_name]
 
-    def addObject(self, object_id):
+    def _addObject(self, object_id):
         if object_id not in self.objects:
             self.lastID += 1
             self.objects[object_id] = self.lastID
@@ -80,42 +74,43 @@ class Mip:
     def getObjectId(self, id):
         return self.objects[id]
 
+    def getUserId(self, id):
+        return self.users[id]
+
     def updateMIP(self, session):
         self.iteration += 1
         self.centrality = None
         user = session.user
-        user_node = self.addUser(user)
+        user_node = self._addUser(user)
         user_att = self.mip.nodes[user_node]
         user_att['last_visit'] = self.iteration
 
-        changedAOs = list()
+        changedAOs = {}
         for act in session.actions:
-            ao_node = self.addObject(act.ao)
+            ao_node = self._addObject(act.ao)
             ao_att = self.mip.nodes[ao_node]
-            # ASK: why do we need deleted and what to do if actualy deleted?
-            # ASK: plus, right now is considering deleted for determening interest etc. can we use it?
-            ao_att['deleted'] = False
-            if act.actType == 'delete':  # label deleted objects as deleted
-                ao_att['deleted'] = True
+            ao_att['deleted'] = (act.actType == 'delete')  # label deleted objects as deleted
 
-            assert ao_node not in changedAOs, "assuming only one action per object"
+            assert ao_node not in changedAOs, "assuming only one action per object in one session"
             ao_att['revisions'].append(self.iteration)  # add revision.
-            changedAOs.append(ao_node)
-            self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc + self.userDecay)
+            changedAOs[ao_node] = act.weightInc
+            self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)  # adding weights to edge between user and object
 
-        for n in self.getLiveAos(user_node):
-            self.mip[user_node][n]['weight'] = max(0, self.mip[user_node][n]['weight'] - self.userDecay)
+        # adding weights to edge between two objects that appear in session (total added to : weightInc of both objects)
+        for node1, node2 in permutations(changedAOs, 2):
+            self.updateEdge(node1, node2, 'ao-ao', changedAOs[node1])
 
-        # ASK: why do we need both increment between objects and decay for all others?
-        # ASK why is the increment set to 1 and the decay vary?
-        # ASK should the increment be by act.weightInc?
-        # ASK: for example, if the action is "create", we want strong connnection
-        for node1, node2 in combinations(changedAOs, 2):
-            self.updateEdge(node1, node2, 'ao-ao', 1.0 + self.objectDecay)
-
-        for _, _, att in self.mip.edges(changedAOs, data=True):
-            if att['edge_type'] == 'ao-ao':
+        # decay for edges between objects that only one of them in session
+        for node1, node2, att in self.mip.edges(changedAOs, data=True):
+            if att['edge_type'] == 'ao-ao' and (node1 not in changedAOs or node2 not in changedAOs):
                 att['weight'] = max(0, att['weight'] - self.objectDecay)
+
+        for n in self.mip.neighbors(user_node):
+            if n not in changedAOs:
+                att = self.mip[user_node][n]
+                att['weight'] = max(0, att['weight'] - self.userDecay)  # decay for objects the user didn't interact with in the session
+                if self.mip.nodes[n]['deleted'] == True and self.mip.degree(n, weight='weight') == 0:
+                    self.mip.remove_node(n)  # if an object is deleted and weight of all connected edges is 0 - delete the node from graph
 
     def updateEdge(self, i1, i2, edge_type, increment=1.0):
         if self.mip.has_edge(i1, i2):
@@ -128,53 +123,11 @@ class Mip:
                     }
             self.mip.add_edge(i1, i2, **attr)
 
-    '''
-    -----------------------------------------------------------------------------
-    Proximity functions start
-    -----------------------------------------------------------------------------
-    '''
-
-    def adamicAdarProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
-        """
-        computes Adamic/Adar proximity between nodes, adjusted to consider edge weights
-        here's adamic/adar implementation in networkx. Modifying to consider edge weights
-        def predict(u, v):
-            return sum(1 / math.log(G.degree(w))
-                       for w in nx.common_neighbors(G, u, v))
-        """
-        proximity = 0.0
-        for node in nx.common_neighbors(self.mip, s, t):
-            weights = self.mip[s][node]['weight'] + self.mip[t][node]['weight']  # the weight of the path connecting s and t through the current node
-            total_rank = self.mip.degree(node, weight='weight')
-            if weights != 0 and total_rank != 1:  # 0 essentially means no connection
-                # ASK: need to be inf if 1? bu-g here in the original formula: proximity += (weights*(1/(math.log(self.mip.degree(node, weight = 'weight'))+0.00000000000000000000000001)))
-                proximity += weights * 1 / math.log(total_rank)  # gives more weight to "rare" shared neighbors
-        return proximity
-
     def simpleProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
         sharedWeight = 0.0
         for node in nx.common_neighbors(self.mip, s, t):
             sharedWeight += self.mip[s][node]['weight'] + self.mip[t][node]['weight']  # the weight of the path connecting s and t through the current node
         return sharedWeight / (self.mip.degree(s, weight='weight') + self.mip.degree(t, weight='weight'))
-
-    def edgeBasedProximity(self, s, t, edgeWeight=0.7):
-        simpleProximity = self.simpleProximity(s, t)
-        edgeProximity = 0.0
-        if self.mip.has_edge(s, t):
-            edgeProximity = self.mip[s][t]['weight'] / self.mip.degree(s, weight='weight')
-        return edgeWeight * edgeProximity + (1 - edgeWeight) * simpleProximity
-
-    '''
-    -----------------------------------------------------------------------------
-    Proximity functions End
-    -----------------------------------------------------------------------------
-    '''
-
-    '''
-    -----------------------------------------------------------------------------
-    MIPs reasoning functions start
-    -----------------------------------------------------------------------------
-    '''
 
     def DegreeOfInterestMIPs(self, user, obj):
         """
@@ -182,27 +135,22 @@ class Mip:
         gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
         """
         if self.centrality is None:
-            # ASK: need better centrality!!!
-            self.centrality = nx.degree_centrality(self.mip)  # , weight='weight')
+            self.centrality = nx.degree_centrality(self.mip)
 
         api_obj = 0.0
         if self.alpha > 0:
             api_obj = self.centrality[obj]  # node centrality (apriori component)
 
-        # compute proximity between user node and object node using Cycle-Free-Edge-Conductance from Koren et al. 2007 or Adamic/Adar
         proximity = 0.0
-        if self.beta > 0 and user in self.users:  # no point to compute proximity if beta1 is 0... (no weight)
-            proximity = self.similarityMetric(self.users[user], obj)
+        if self.beta > 0 and user in self.users:
+            proximity = self.simpleProximity(self.users[user], obj)
 
         changeExtent = 0.0  # need to consider how frequently the object has been changed since user last known about it: user is userId (might not be in MIP), obj is object Node id
         if self.gamma > 0:
             changeExtent = self.changeExtent(user, obj)
 
         return self.alpha * api_obj + self.beta * proximity + self.gamma * changeExtent
-        # ASK: check that scales work out, otherwise need some normalization
 
-    # ASK: how does changeExtend changes when lastvisit and lastknown are the same?
-    # ASK: should time be a factor?
     def changeExtent(self, userId, aoNode):
         """
         computes the extent/frequency to which an object was changed since the last time the user was notified about it
@@ -227,12 +175,6 @@ class Mip:
         if user in self.users and time == -1:
             time = self.mip.nodes[self.users[user]]['last_visit']
         return filter(lambda ao: self.mip.nodes[ao[0]]['revisions'][-1] > time, self.rankObjects(user))
-
-    '''
-    -----------------------------------------------------------------------------
-    MIPs reasoning functions end
-    -----------------------------------------------------------------------------
-    '''
 
     def drawMip(self):
         nx.draw(self.mip)

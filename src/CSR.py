@@ -37,8 +37,7 @@ class CsrFiles:
 
             elif file.changetype == Models.ChangeEnum.DELETED:
                 status = "removed"
-                #TODO: Not good if re-instated
-                objId = self.mapping.pop(file.source)
+                objId = self.mapping[file.source]
 
             else:
                 raise ValueError(f"Unknown file status: {str(file)}")
@@ -46,6 +45,7 @@ class CsrFiles:
             session.addAction(Action(objId, status))
 
         return session
+
 
 class CsrCode:
     def __init__(self):
@@ -61,21 +61,20 @@ class CsrCode:
         file: Models.FileChangeset = None  # for autocorrect
         for file in commit.files:
             if file.changetype == Models.ChangeEnum.ADDED:
-                status = "added"
+                status = 'add'
                 file_id = self.filesMapping[file.target]
 
             elif file.changetype == Models.ChangeEnum.MODIFIED:
-                status = "modified"
+                status = 'edit'
                 file_id = self.filesMapping[file.target]
 
             elif file.changetype == Models.ChangeEnum.RENAMED:
                 self.filesMapping.rename(file.source, file.target)
-                status = "renamed"
+                status = 'rename'
                 file_id = self.filesMapping[file.target]
 
             elif file.changetype == Models.ChangeEnum.DELETED:
-                status = "removed"
-                file_id = self.filesMapping.pop(file.source)
+                status = 'delete'
 
             else:
                 raise ValueError(f"Unknown file status: {str(file)}")
@@ -97,4 +96,3 @@ class CsrCode:
         fullname = functools.partial(self._func_fullname, file=file_id)
         for f in self.functionsSet.intersection(set(map(fullname, lines))):
             yield Action(f, status)
-

@@ -34,7 +34,7 @@ class Session:
 class Action:
     def __init__(self, ao, actType, weightInc=1):
         self.ao = ao
-        self.actType = actType  # view, edit, add, delete
+        self.actType = actType  # rename, edit, add, delete
         self.weightInc = weightInc
         self.mipNodeID = None # currently not aware of the mip node
 

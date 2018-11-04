@@ -12,7 +12,6 @@ def verbose_print(s):
 
 
 def eval_func(x, *args) -> float:
-    # ASK: how to evaluate? on how many items? what formula?
     mip, csr = deepcopy(args)
     verbose_print(f"current values: {x}")
     score = []
@@ -25,7 +24,6 @@ def eval_func(x, *args) -> float:
             session = csr[i].commit_to_session(commit)
             objects = set(session.get_session_objects())
             pred_hits = []
-            # ASK: Rankobjects or RankChanged?
             for pred_o, pred_doi in mip[i].rankObjects(session.user):
                 if pred_o in objects:
                     score[-1] += pred_doi
@@ -48,7 +46,6 @@ def eval_func(x, *args) -> float:
 
 if __name__ == "__main__":
     tm.start()
-    # ASK: we can't evaluate for different k, need k=1 every time.
     p = Provider(0.8)
 
     mip_models = []
