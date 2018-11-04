@@ -143,7 +143,7 @@ class Mip:
         sharedWeight = 0.0
         for node in nx.common_neighbors(self.mip, s, t):
             sharedWeight += self.mip[s][node]['weight'] + self.mip[t][node]['weight']  # the weight of the path connecting s and t through the current node
-        if math.isclose(sharedWeight, 0, ): return 0.0
+        if math.isclose(sharedWeight, 0, abs_tol=1e-09): return 0.0
         return sharedWeight / (self.mip.degree(s, weight='weight') + self.mip.degree(t, weight='weight'))
 
     def DegreeOfInterestMIPs(self, user, obj):
