@@ -1,7 +1,7 @@
 from scipy.optimize import minimize, Bounds
-from src.MIP import Mip, TooManyActionsError
+from src.MIP import Mip
 from numpy import array
-from CSR import CsrFiles
+from CSR import CsrFiles, TooManyActionsError
 from Factory import Provider
 from copy import deepcopy
 from prettytable import PrettyTable as pt
@@ -9,7 +9,7 @@ from DataModule.models import ChangeEnum
 
 
 def verbose_print(s):
-     print(s)
+    print(s)
 
 
 def eval_func(x, *args) -> float:
@@ -22,12 +22,12 @@ def eval_func(x, *args) -> float:
         score.append(0.0)
         total_doi = 0.0
         t = pt(['user', 'score', 'top 3', 'top 5', 'top 10', 'total_objects'])
-        for commit_i, commit in enumerate(repo, 1):
+        for commit in repo:
             session = csr[i].commit_to_session(commit)
             objects = session.get_session_objects(ChangeEnum.MODIFIED)
             pred_hits = []
-            for ao in session.actions:
-                verbose_print(ao)
+            # for ao in session.actions:
+            #     verbose_print(ao)
 
             for pred_o, pred_doi in mip[i].rankObjects(session.user):
                 total_doi += pred_doi
@@ -74,10 +74,12 @@ if __name__ == "__main__":
             ignore_repos.add(repo.name)
             mip_models.pop()
             csr_models.pop()
+            Provider.removeRepo(repo.name)
 
 
     x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))
     y = list(y for y in p.Y if y.name not in ignore_repos)
     res = minimize(eval_func, x0, (mip_models, csr_models), bounds=Bounds(0, 10))
 
+    print("------------------ RESULTS ------------------------")
     print(res)

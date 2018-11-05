@@ -1,5 +1,27 @@
-from DataModule.DataQuery import DataExtractor
+from collections import deque
+from typing import Generic, Iterable
+
+from DataModule.DataQuery import DataExtractor, TypeVar
 from pyutils.file_paths import STORAGE_DIR, REPOSITORIES_LIST_FILE
+
+T = TypeVar('T')
+
+
+class ReusableGenerator(Generic[T]):
+    def __init__(self, gen: Iterable[T]):
+        self._gen = iter(gen)
+        self._arr = deque()
+
+    def __iter__(self):
+        if self._arr:
+            self._gen = None
+            return iter(self._arr)
+        return self
+
+    def __next__(self) -> T:
+        res = next(self._gen)
+        self._arr.append(res)
+        return res
 
 
 class Repo:
@@ -34,9 +56,6 @@ class Provider:
             self.X = [self._getTrain(repo)
                       for repo in repos]
 
-            # Assuming that the caller will finish query the X before stating on Y.
-            ## Y is a generator so it will wait after processing the X.
-            ## (otherwise - it will provide bugs)
             self.Y = [self._getTest(repo)
                       for repo in repos]
 
@@ -47,7 +66,15 @@ class Provider:
 
     def _getTest(self, repo):
         data_extractor = self.data_extractors[repo]
-        return Repo(repo, list(data_extractor.get_test()))
+        return Repo(repo, ReusableGenerator(data_extractor.get_test()))
+
+    @staticmethod
+    def removeRepo(repo):
+        data = open(REPOSITORIES_LIST_FILE).read()
+        i = data.index(repo)
+        if "#" not in data[i - 3:i]:
+            open(REPOSITORIES_LIST_FILE, "w").write(
+                data[:i] + "# TOO MUCH FILES # " + data[i:])
 
 
 if __name__ == '__main__':

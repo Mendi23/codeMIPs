@@ -12,6 +12,11 @@ from Entities import Action, Session
 import DataModule.models as Models
 
 SUPPORTED_FILE_TYPES = {"c", "h", "cpp", "hpp", "py", "cs"}
+ACTIONS_THRESHOLD = 1800
+
+
+class TooManyActionsError(Exception):
+    pass
 
 
 class CsrFiles:
@@ -42,6 +47,11 @@ class CsrFiles:
                 if self._supported_type(file.target):
                     self._inner_process(objId, file, session)
 
+        ## validating number of actions:
+        if len(session.actions) > ACTIONS_THRESHOLD:
+            raise TooManyActionsError(
+                f"Got too many actions at once: {len(session.actions)}. This will lead to MemoryError.")
+        ##
         return session
 
     def _inner_process(self, objId: int, file: Models.FileChangeset, session: Session):

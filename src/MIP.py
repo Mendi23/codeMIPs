@@ -13,16 +13,12 @@ from pyutils.my_sorted import MySorted
 import networkx as nx
 import matplotlib.pyplot as plt
 
-ACTIONS_THRESHOLD = 1800
 OBJECT_DECAY = 1.0
 USER_DECAY = 1.0
 GAMMA = 0.2
 BETA = 0.6
 ALPHA = 0.2
 
-
-class TooManyActionsError(Exception):
-    pass
 
 
 class Mip:
@@ -32,7 +28,7 @@ class Mip:
     @:param user_decay, object_decay
     """
 
-    def __init__(self, model_name=None, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY, actions_threshold=ACTIONS_THRESHOLD):
+    def __init__(self, model_name=None, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
@@ -44,15 +40,14 @@ class Mip:
         self.name = model_name  # for referencing
         self.centrality = None
 
-        self.set_params(alpha, beta, gamma, user_decay, object_decay, actions_threshold)
+        self.set_params(alpha, beta, gamma, user_decay, object_decay)
 
-    def set_params(self, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY, actions_threshold=ACTIONS_THRESHOLD):
+    def set_params(self, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY):
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
         self.beta = beta  # weight given to the proximity between the user and the object
         self.gamma = gamma  # weight given to the extent of change
         self.userDecay = user_decay
         self.objectDecay = object_decay
-        self.actions_threshold = actions_threshold
 
     def getLiveAos(self, userID=None):
         """
@@ -97,11 +92,6 @@ class Mip:
         user_node = self._addUser(user)
         user_att = self.mip.nodes[user_node]
         user_att['last_visit'] = self.iteration
-
-        ## validating number of actions:
-        if len(session.actions) > self.actions_threshold:
-            raise TooManyActionsError(f"Got too many actions at once: {len(session.actions)}. This will lead to MemoryError.")
-        ##
 
         changedAOs = {}
         for act in session.actions:

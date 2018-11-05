@@ -54,8 +54,8 @@ class GithubQuery:
             print(f"[DataQuery] - cloning repo: {repouri}..")
             ret.repo = Repo.clone_from(ret.uri, ret.storage, bare=True)
 
-        print("[DataQuery] - fetch..")
-        ret.repo.remotes.origin.fetch(MASTER)
+        # print("[DataQuery] - fetch..")
+        # ret.repo.remotes.origin.fetch(MASTER)
         print("[DataQuery] - ready!")
         return ret
 
@@ -175,9 +175,8 @@ class DataExtractor:
             for fname in commit.stats.files.keys():
                 fc = self._create_file_changeset(fname, pfiles, commit.hexsha)
                 cobj.files.append(fc)
-            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
             cobj.files.sort()  # place "RENAME" before others
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             if CACHE_THE_DATA_MF:
                 storage.save_obj(cobj)
