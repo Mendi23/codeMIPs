@@ -82,22 +82,6 @@ class GithubQuery:
 
 
 class DataExtractor:
-    re_path_file = r"(?:[^/{}\\=>]+)"
-    re_path_part = f"(?:{re_path_file}\/)"
-    re_path_full = f"(?:{re_path_part}*{re_path_file})"
-
-    re_patt = "^(?:" \
-              f"(?P<root>{re_path_part}*)" \
-              r"(?:\{" \
-              f"(?P<before>{re_path_full})? => (?P<after>{re_path_full})?" \
-              r"\})" \
-              f"(?P<rest>\/?{re_path_full})?" \
-              "|" \
-              f"(?P<before2>{re_path_full})? => (?P<after2>{re_path_full})?" \
-              "|" \
-              f"(?P<rest_only>{re_path_full})" \
-              ")$"
-    re_match = re.compile(re_patt)
 
     def __init__(self, savedir, repouri, ratio=None, k_commits=None):
         self.ratio = ratio if ratio is not None else 0.75
@@ -233,26 +217,6 @@ class DataExtractor:
 
         source = self._build_path((root, before, rest))
         target = self._build_path((root, after, rest))
-
-        if source != target:
-            changetype = Models.ChangeEnum.RENAMED
-        return changetype, source, target
-
-    def _extract_metadata__old(self, fname):
-        changetype = Models.ChangeEnum.MODIFIED
-        groups = self.re_match.match(fname)
-        assert groups, f"'{fname}' was not recognized by my regex"
-
-        if groups["rest_only"]:
-            source = target = groups["rest_only"]
-        elif groups["before2"] or groups["after2"]:
-            source = groups["before2"] or ""
-            target = groups["after2"] or ""
-        else:
-            root = groups["root"] or ""
-            rest = groups["rest"] or ""
-            source = (root + (groups["before"] or "") + rest).replace("//", "/")
-            target = (root + (groups["after"] or "") + rest).replace("//", "/")
 
         if source != target:
             changetype = Models.ChangeEnum.RENAMED
