@@ -41,8 +41,8 @@ class Provider:
         self.ratio = ratio
         self.data_extractors = {}
         if repo is not None:
-            self.X = self._getTrain(repo)
-            self.Y = self._getTest(repo)
+            self.X = [self._getTrain(repo)]
+            self.Y = [self._getTest(repo)]
         else:
             gen = (line.strip().split("#", 1)[0]
                    for line in open(REPOSITORIES_LIST_FILE))

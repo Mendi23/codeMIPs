@@ -13,7 +13,7 @@ from DataModule.utils import *
 
 from pyutils.file_paths import STORAGE_DIR
 
-CACHE_THE_DATA_MF = True
+CACHE_THE_DATA = True
 DEBUG_1 = False
 
 PER_PAGE = 100
@@ -54,8 +54,6 @@ class GithubQuery:
             print(f"[DataQuery] - cloning repo: {repouri}..")
             ret.repo = Repo.clone_from(ret.uri, ret.storage, bare=True)
 
-        # print("[DataQuery] - fetch..")
-        # ret.repo.remotes.origin.fetch(MASTER)
         print("[DataQuery] - ready!")
         return ret
 
@@ -130,10 +128,6 @@ class DataExtractor:
         storage = Storage(jsons_filename, PER_PAGE, jsons_export, jsons_import)
         return storage
 
-    def get_train_test_generator(self) -> Gen[Models.Commit]:
-        storage = self.initialize_repo_storage()
-        return Gen(self.first_slice, self._iterate_commits(storage))
-
     def get_train(self) -> Iterable[Models.Commit]:
         storage = self.initialize_repo_storage()
         until = self.num_of_commits - self.first_slice
@@ -150,11 +144,14 @@ class DataExtractor:
     def _iterate_commits(self, storage: Storage, until=None, start_from=None):
         query: GithubQuery = self.query
 
-        if CACHE_THE_DATA_MF:
-            yield from self.load_commits(storage)
+        if CACHE_THE_DATA:
+            firsttime = True
+            for commit in self.load_commits(storage):
+                if firsttime:
+                    print("SOME OF THE DATA IS LOADED FROM CACHE!")
+                    firsttime = False
+                yield commit
         skip_n = storage.objects_count
-        if skip_n > 0:
-            print("SOME OF THE DATA WERE LOADED FROM CACHE!")
 
         for i, commit in enumerate(query.repo_iterate_commits(until, start_from)):
             if i < skip_n: continue
@@ -178,7 +175,7 @@ class DataExtractor:
             cobj.files.sort()  # place "RENAME" before others
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-            if CACHE_THE_DATA_MF:
+            if CACHE_THE_DATA:
                 storage.save_obj(cobj)
             yield cobj
         ### END
@@ -223,6 +220,26 @@ class DataExtractor:
 
     def _extract_metadata(self, fname):
         changetype = Models.ChangeEnum.MODIFIED
+        chunk = fname
+        a, b = chunk.find("{"), chunk.find("}")
+        a = a if a >= 0 else 0
+        b = b if b >= 0 else len(chunk)
+
+        root, chunk, rest = chunk[:a], chunk[a:b], chunk[b:]
+        if " => " in chunk:
+            before, after = chunk.split(" => ", 1)
+        else:
+            before = after = chunk
+
+        source = self._build_path((root, before, rest))
+        target = self._build_path((root, after, rest))
+
+        if source != target:
+            changetype = Models.ChangeEnum.RENAMED
+        return changetype, source, target
+
+    def _extract_metadata__old(self, fname):
+        changetype = Models.ChangeEnum.MODIFIED
         groups = self.re_match.match(fname)
         assert groups, f"'{fname}' was not recognized by my regex"
 
@@ -248,4 +265,8 @@ class DataExtractor:
             patch.target_lines = inner.target
             patch.section_header = inner.section_header
             patches.append(patch)
+
+    @staticmethod
+    def _build_path(path):
+        return ("".join([s.strip(" {}") for s in path])).replace("//", "/")
 

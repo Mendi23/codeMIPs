@@ -12,14 +12,17 @@ if __name__ == "__main__":
     mip = Mip()
     csr = CsrFiles()
     p = Provider(0.8, repo)
+
     result_folder = path.join(RESULTS_DIR,repo.split('/')[-1])
     if not path.exists(result_folder):
         mkdir(result_folder)
 
-    for i, commit in enumerate(p.X):
+    X, Y = p.X[0], p.Y[0]
+
+    for i, commit in enumerate(X):
         mip.updateMIP(csr.commit_to_session(commit))
 
-    for j, commit in enumerate(p.Y, i):
+    for j, commit in enumerate(Y, i):
 
         session = csr.commit_to_session(commit)
         objects = session.get_session_objects(ChangeEnum.MODIFIED)
