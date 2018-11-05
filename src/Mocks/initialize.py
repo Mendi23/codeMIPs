@@ -3,22 +3,28 @@ from CSR import CsrFiles
 from Factory import Provider
 from prettytable import PrettyTable as pt
 from DataModule.models import ChangeEnum
+import matplotlib.pyplot as plt
+from os import path, mkdir
+from pyutils.file_paths import RESULTS_DIR
 
 if __name__ == "__main__":
+    repo = "urielha/heapdict"
     mip = Mip()
     csr = CsrFiles()
-    p = Provider(0.8, "urielha/heapdict")
+    p = Provider(0.8, repo)
+    result_folder = path.join(RESULTS_DIR,repo.split('/')[-1])
+    mkdir(result_folder)
 
-    for commit in p.X:
+    for i, commit in enumerate(p.X):
         mip.updateMIP(csr.commit_to_session(commit))
 
-    mip.drawMip()
+    for j, commit in enumerate(p.Y, i):
+        mip.drawMip()
+        plt.suptitle(f"graph before commit {j}", fontsize=14, fontweight='bold')
 
-    t = pt(['user', 'score', 'top 3', 'top 5', 'top 10', 'total_objects'])
-    for commit in p.Y:
         session = csr.commit_to_session(commit)
-        print(session)
         objects = session.get_session_objects(ChangeEnum.MODIFIED)
+
         pred_hits = []
         score = 0.0
         total_doi = 0.0
@@ -34,10 +40,5 @@ if __name__ == "__main__":
         top_10 = sum(pred_hits[:10]) if len(pred_hits) >= 10 else -1
         top_5 = sum(pred_hits[:5]) if len(pred_hits) >= 5 else -1
         top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else -1
-        t.add_row([session.user.split('@', 1)[0], score / total_doi, top_3, top_5, top_10, len(objects)])
-        # urielha 10
-        # 7 8
-        # print(mip.mip.get_edge_data(10, 8))
-        print(f"predicted: {pred_hits}")
+        plt.savefig(path.join(result_folder, str(j)))
         mip.updateMIP(session)
-    print(t)

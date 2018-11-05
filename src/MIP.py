@@ -6,12 +6,11 @@ Created on Jun 7, 2015
 Edited: Aug-Sep, 2018
 @editors: Uriel, Mendi
 '''
-from itertools import permutations, chain
+from itertools import permutations
 import math
 from DataModule.models import ChangeEnum
 from pyutils.my_sorted import MySorted
 import networkx as nx
-import matplotlib.pyplot as plt
 
 ACTIONS_THRESHOLD = 1800
 OBJECT_DECAY = 1.0
