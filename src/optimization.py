@@ -1,11 +1,12 @@
 
 from scipy.optimize import minimize, Bounds
 from src.MIP import Mip
-from numpy import array, inf
+from numpy import array
 from CSR import CsrFiles
 from Factory import Provider
 from copy import deepcopy
 from prettytable import PrettyTable as pt
+from DataModule.models import ChangeEnum
 
 def verbose_print(s):
     pass#print(s)
@@ -22,7 +23,7 @@ def eval_func(x, *args) -> float:
         t = pt(['user', 'score', 'top 3', 'top 5', 'top 10', 'all'])
         for commit_i, commit in enumerate(repo, 1):
             session = csr[i].commit_to_session(commit)
-            objects = set(session.get_session_objects())
+            objects = set(session.get_session_objects(ChangeEnum.MODIFIED))
             pred_hits = []
             for pred_o, pred_doi in mip[i].rankObjects(session.user):
                 if pred_o in objects:

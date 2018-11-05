@@ -2,6 +2,7 @@ from src.MIP import Mip
 from CSR import CsrFiles
 from Factory import Provider
 from prettytable import PrettyTable as pt
+from DataModule.models import ChangeEnum
 
 
 if __name__ == "__main__":
@@ -17,7 +18,7 @@ if __name__ == "__main__":
     for commit in p.Y:
         session = csr.commit_to_session(commit)
         print(session)
-        objects = set(session.get_session_objects())
+        objects = set(session.get_session_objects(ChangeEnum.MODIFIED))
         pred_hits = []
         score = 0.0
         for pred_o, pred_doi in mip.rankObjects(session.user):

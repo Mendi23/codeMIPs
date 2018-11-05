@@ -13,6 +13,7 @@ import DataModule.models as Models
 
 SUPPORTED_FILE_TYPES = {"c", "h", "cpp", "hpp", "py", "cs"}
 
+
 class CsrFiles:
     def __init__(self):
         self.csr = nx.Graph()
@@ -23,33 +24,26 @@ class CsrFiles:
 
         for file in commit.files:
             if file.filename.rsplit(".")[-1] in SUPPORTED_FILE_TYPES:
-                if file.changetype == Models.ChangeEnum.ADDED:
-                    objId = self.filesMapping[file.target]
-
-                elif file.changetype == Models.ChangeEnum.MODIFIED:
-                    objId = self.filesMapping[file.target]
-
-                elif file.changetype == Models.ChangeEnum.RENAMED:
+                if file.changetype == Models.ChangeEnum.RENAMED:
                     try:
                         self.filesMapping.rename(file.source, file.target)
                     except KeyError:
                         print(f"! WARNING ! rename file source not found. "
                               f"{commit.sha}: {file.source}->{file.target}")
                         raise
-                    objId = self.filesMapping[file.target]
-
-                elif file.changetype == Models.ChangeEnum.DELETED:
-                    objId = self.filesMapping[file.source]
-
                 else:
-                    raise ValueError(f"Unknown file status: {str(file)}")
-
-                self.addAction(objId, file, session)
+                    objId = self.filesMapping[file.target]
+                    if file.changetype == Models.ChangeEnum.DELETED:
+                        objId = self.filesMapping[file.source]
+                    elif file.changetype != Models.ChangeEnum.MODIFIED and \
+                            file.changetype != Models.ChangeEnum.ADDED:
+                        raise ValueError(f"Unknown file status: {str(file)}")
+                    session.addAction(Action(objId, file.changetype))
 
         return session
-
-    def addAction(self, objId: int, file: Models.FileChangeset, session: Session):
-        session.addAction(Action(objId, file.changetype))
+    #
+    # def addAction(self, objId: int, file: Models.FileChangeset, session: Session):
+    #     session.addAction(Action(objId, file.changetype))
 
 
 class CsrCode(CsrFiles):
@@ -71,9 +65,9 @@ class CsrCode(CsrFiles):
             functions.add(Action(func_id, file.changetype))
 
             yield from self.batch_get_functions(objId, Models.ChangeEnum.DELETED,
-                                                patch.source_lines)
+                patch.source_lines)
             yield from self.batch_get_functions(objId, Models.ChangeEnum.ADDED,
-                                                patch.target_lines)
+                patch.target_lines)
 
         yield from functions
 

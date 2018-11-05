@@ -6,8 +6,6 @@ Created on Jun 11, 2015
 Edited: Aug-Sep, 2018
 @editors: Uriel, Mendi
 '''
-from enum import Enum
-
 from DataModule.models import ChangeEnum
 
 
@@ -21,11 +19,11 @@ class Session:
     def addAction(self, action):
         self.actions.append(action)
 
-    def get_session_objects(self):
+    def get_session_objects(self, action = None):
         '''
         :return: a list of object's modified in the session
         '''
-        return [a.ao for a in self.actions]
+        return [a.ao for a in self.actions if action is None or a.actType == action]
 
     def __str__(self):
         toPrint = f"session at time {self.time} user = {self.user}\n"
@@ -48,7 +46,7 @@ class Action:
 
     def __eq__(self, o: object) -> bool:
         return (
-            o != None and
+            o is not None and
             isinstance(o, Action) and
             self.ao == o.ao and self.actType == o.actType
         )
