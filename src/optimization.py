@@ -1,4 +1,4 @@
-from scipy.optimize import minimize, Bounds
+from scipy.optimize import minimize, Bounds, LinearConstraint
 from src.MIP import Mip
 from numpy import array
 from CSR import CsrFiles
@@ -64,7 +64,8 @@ if __name__ == "__main__":
             mip_models[-1].updateMIP(csr_models[-1].commit_to_session(commit))
 
     x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))
+    A = LinearConstraint(array((1,1,1,0,0)), 1, 1)
     y = list(p.Y)
-    res = minimize(eval_func, x0, (mip_models, csr_models), bounds=Bounds(0, 2))
+    res = minimize(eval_func, x0, (mip_models, csr_models), bounds=Bounds(0, 10), constraints=A)
 
     print(res)
