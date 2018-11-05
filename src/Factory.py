@@ -13,15 +13,18 @@ class ReusableGenerator(Generic[T]):
         self._arr = deque()
 
     def __iter__(self):
-        if self._arr:
-            self._gen = None
-            return iter(self._arr)
-        return self
+        return self._iterator()
 
-    def __next__(self) -> T:
-        res = next(self._gen)
-        self._arr.append(res)
-        return res
+    def _iterator(self) -> T:
+        yield from self._arr
+
+        try:
+            while self._gen is not None:
+                res = next(self._gen)
+                self._arr.append(res)
+                yield res
+        except StopIteration:
+            self._gen = None
 
 
 class Repo:
