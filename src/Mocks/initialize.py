@@ -20,12 +20,13 @@ if __name__ == "__main__":
         mip.updateMIP(csr.commit_to_session(commit))
 
     for j, commit in enumerate(p.Y, i):
-        plt.figure(clear=True)
-        mip.drawMip()
-        plt.suptitle(f"graph before commit {j}", fontsize=14, fontweight='bold')
 
         session = csr.commit_to_session(commit)
         objects = session.get_session_objects(ChangeEnum.MODIFIED)
+
+        plt.figure(clear=True)
+        mip.drawMip(session.user)
+        plt.suptitle(f"graph before commit {j}", fontsize=14, fontweight='bold')
 
         pred_hits = []
         score = 0.0
@@ -42,6 +43,10 @@ if __name__ == "__main__":
         top_10 = sum(pred_hits[:10]) if len(pred_hits) >= 10 else -1
         top_5 = sum(pred_hits[:5]) if len(pred_hits) >= 5 else -1
         top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else -1
+
+
+
+
         plt.figlegend()
         plt.savefig(path.join(result_folder, str(j)))
         mip.updateMIP(session)

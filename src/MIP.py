@@ -11,6 +11,7 @@ import math
 from DataModule.models import ChangeEnum
 from pyutils.my_sorted import MySorted
 import networkx as nx
+import matplotlib.pyplot as plt
 
 ACTIONS_THRESHOLD = 1800
 OBJECT_DECAY = 1.0
@@ -190,32 +191,49 @@ class Mip:
             else numOfChanges / float(self.iteration - fromRevision)
 
     def rankObjects(self, user):
-        tupledAos = ((self.nodeIDsToObjectsIds[ao], self.DegreeOfInterestMIPs(user, ao)) \
-                     for ao in self.getLiveAos())
-        return sorted(tupledAos, key=lambda x: x[1], reverse=True)
+        return sorted(self._getObjectsDOI(user).items(), key=lambda x: x[1], reverse=True)
+        # return sorted(((self.nodeIDsToObjectsIds[x[0]],x[1]) for x in self._getObjectNodes(user)),
+        #     key=lambda x: x[1], reverse=True)
 
     def rankChanged(self, user, time=-1):
         if user in self.users and time == -1:
             time = self.mip.nodes[self.users[user]]['last_visit']
         return filter(lambda ao: self.mip.nodes[ao[0]]['revisions'][-1] > time, self.rankObjects(user))
 
-    def drawMip(self):
-        userNcolor = 'y'
-        userNshape = 's'
-        objNcolor = 'r'
+    def _getObjectsDOI(self, user):
+        return {ao : self.DegreeOfInterestMIPs(user, ao) for ao in self.getLiveAos()}
+        #return ((ao, self.DegreeOfInterestMIPs(user, ao)) for ao in self.getLiveAos())
+
+    def drawMip(self, user_focus):
+        """
+        node size represent it's (weighted) rank
+        node color reprent it's proximity
+        """
+        userNcolor = 'b'
+        userNshape = '^'
+        focususerNshape = 's'
+        objNcmap = plt.cm.get_cmap("autumn")
+        #objFull = self._getObjectsDOI(user_focus)
+        #objN, objNcolor = zip(*objFull.items())
+        objN, objNcolor = zip(*self._getObjectsDOI(user_focus).items())
         objNshape = 'o'
         userLsize = 6
         objLsize = 10
+        user_node = self._addUser(user_focus)
+
         layout = nx.circular_layout(self.mip)  # pick graph layout
         nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=self.nodeIDsToUsersIds.keys(),
             node_color=userNcolor, node_shape=userNshape, label='user_node')
-        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=self.nodeIDsToObjectsIds.keys(),
-            node_color=objNcolor, node_shape=objNshape, label='object_node')
+        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=[user_node],
+            node_color=userNcolor, node_shape=focususerNshape, label='focus_user_node')
+        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=objN,
+            node_color=objNcolor, node_shape=objNshape, cmap=objNcmap, label='object_node')
         nx.draw_networkx_labels(self.mip, layout, labels=self.nodeIDsToUsersIds, font_size=userLsize)
         nx.draw_networkx_labels(self.mip, layout, labels=self.nodeIDsToObjectsIds, font_size=objLsize)
+        #nx.draw_networkx_labels(self.mip, layout, labels=objFull, font_size=objLsize)
         labels = {(edge[0], edge[1]): edge[2]['weight'] for edge in self.mip.edges(data=True)}
         nx.draw_networkx_edges(self.mip, pos=layout)
-        nx.draw_networkx_edge_labels(self.mip, pos=layout, edge_labels=labels, label='edge_weight')
+        nx.draw_networkx_edge_labels(self.mip, pos=layout, edge_labels=labels)
 
     def __str__(self):
         return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}"
