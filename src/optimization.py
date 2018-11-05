@@ -1,5 +1,5 @@
 from scipy.optimize import minimize, Bounds
-from src.MIP import Mip
+from src.MIP import Mip, TooManyActionsError
 from numpy import array
 from CSR import CsrFiles
 from Factory import Provider
@@ -58,15 +58,26 @@ if __name__ == "__main__":
     mip_models = []
     csr_models = []
 
+    ignore_repos = set()
     for repo in p.X:
         mip_models.append(Mip(f"{repo.name}"))
         csr_models.append(CsrFiles())
-        for commit in repo:
-            # print(f"    files: {len(commit.files)}")
-            mip_models[-1].updateMIP(csr_models[-1].commit_to_session(commit))
+        try:
+            for commit in repo:
+                #verbose_print(f"    files: {len(commit.files)}")
+                mip_models[-1].updateMIP(csr_models[-1].commit_to_session(commit))
+        except TooManyActionsError as err:
+            print("!~" * 20)
+            print(f"Dropping repo {repo.name} due to an error:")
+            print(err)
+            print("!~" * 20)
+            ignore_repos.add(repo.name)
+            mip_models.pop()
+            csr_models.pop()
+
 
     x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))
-    y = list(p.Y)
+    y = list(y for y in p.Y if y.name not in ignore_repos)
     res = minimize(eval_func, x0, (mip_models, csr_models), bounds=Bounds(0, 10))
 
     print(res)

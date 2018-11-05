@@ -13,13 +13,15 @@ from pyutils.my_sorted import MySorted
 import networkx as nx
 import matplotlib.pyplot as plt
 
-CHANGED_THRESHOLD = math.inf
+ACTIONS_THRESHOLD = 1800
 OBJECT_DECAY = 1.0
 USER_DECAY = 1.0
 GAMMA = 0.2
 BETA = 0.6
 ALPHA = 0.2
 
+class TooManyActionsError(Exception):
+    pass
 
 class Mip:
     """
@@ -28,7 +30,7 @@ class Mip:
     @:param user_decay, object_decay
     """
 
-    def __init__(self, model_name=None, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY, changed_threshold=CHANGED_THRESHOLD):
+    def __init__(self, model_name=None, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY, actions_threshold=ACTIONS_THRESHOLD):
         self.mip = nx.Graph()  # the representation of the MIP-Net network
         self.users = {}  # user ids
         self.objects = {}  # object ids
@@ -40,15 +42,15 @@ class Mip:
         self.name = model_name  # for referencing
         self.centrality = None
 
-        self.set_params(alpha, beta, gamma, user_decay, object_decay, changed_threshold)
+        self.set_params(alpha, beta, gamma, user_decay, object_decay, actions_threshold)
 
-    def set_params(self, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY, changed_threshold=CHANGED_THRESHOLD):
+    def set_params(self, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY, actions_threshold=ACTIONS_THRESHOLD):
         self.alpha = alpha  # weight given to the global importance (centrality) of the object
         self.beta = beta  # weight given to the proximity between the user and the object
         self.gamma = gamma  # weight given to the extent of change
         self.userDecay = user_decay
         self.objectDecay = object_decay
-        self.changed_threshold = changed_threshold
+        self.actions_threshold = actions_threshold
 
     def getLiveAos(self, userID=None):
         """
@@ -94,6 +96,11 @@ class Mip:
         user_att = self.mip.nodes[user_node]
         user_att['last_visit'] = self.iteration
 
+        ## validating number of actions:
+        if len(session.actions) > self.actions_threshold:
+            raise TooManyActionsError(f"Got too many actions at once: {len(session.actions)}. This will lead to MemoryError.")
+        ##
+
         changedAOs = {}
         for act in session.actions:
             ao_node = self._addObject(act.ao)
@@ -106,9 +113,8 @@ class Mip:
             self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)  # adding weights to edge between user and object
 
         # adding weights to edge between two objects that appear in session (total added to : weightInc of both objects)
-        if len(changedAOs) < self.changed_threshold:
-            for node1, node2 in permutations(changedAOs, 2):
-                self.updateEdge(node1, node2, 'ao-ao', changedAOs[node1])
+        for node1, node2 in permutations(changedAOs, 2):
+            self.updateEdge(node1, node2, 'ao-ao', changedAOs[node1])
 
         # decay for edges between objects that only one of them in session
         for node1, node2, att in self.mip.edges(changedAOs, data=True):
@@ -123,7 +129,7 @@ class Mip:
                 if self.mip.nodes[n]['deleted'] == True and self.mip.degree(n, weight='weight') == 0:
                     to_remove.add(n)  # if an object is deleted and weight of all connected edges is 0 - delete the node from graph
 
-        if to_remove: print("--------- nodes deleted ------------")
+        # if to_remove: print("--------- nodes deleted ------------")
         for n in to_remove:
             self.mip.remove_node(n)
 
