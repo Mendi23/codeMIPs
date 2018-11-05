@@ -11,7 +11,6 @@ from itertools import permutations
 from DataModule.models import ChangeEnum
 from pyutils.my_sorted import MySorted
 import networkx as nx
-import math
 import matplotlib.pyplot as plt
 
 CHANGED_THRESHOLD = math.inf
