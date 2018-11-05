@@ -202,21 +202,22 @@ class Mip:
         userNcolor = 'y'
         userNshape = 's'
         objNcolor = 'r'
-        objNShape = 'o'
+        objNshape = 'o'
+        userLsize = 6
+        objLsize = 10
         layout = nx.circular_layout(self.mip)  # pick graph layout
 
-        
+
         nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=self.nodeIDsToUsersIds.keys(),
             node_color=userNcolor, node_shape=userNshape)
         nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=self.nodeIDsToObjectsIds.keys(),
-            node_color=objNcolor, node_shape=objNShape)
-        nx.draw_networkx_labels(self.mip,layout,labels={**self.nodeIDsToUsersIds, **self.nodeIDsToObjectsIds})
+            node_color=objNcolor, node_shape=objNshape)
+        nx.draw_networkx_labels(self.mip,layout,labels=self.nodeIDsToUsersIds, font_size=userLsize)
+        nx.draw_networkx_labels(self.mip, layout, labels=self.nodeIDsToObjectsIds, font_size=objLsize)
         labels = {(edge[0],edge[1]): edge[2]['weight'] for edge in self.mip.edges(data=True)}
         nx.draw_networkx_edges(self.mip, pos=layout)
         nx.draw_networkx_edge_labels(self.mip, pos=layout, edge_labels=labels)
 
-        plt.savefig("path.png")
-        #atom
     def __str__(self):
         return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}"
 
