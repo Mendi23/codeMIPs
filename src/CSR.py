@@ -25,12 +25,15 @@ class CsrFiles:
         for file in commit.files:
             if file.filename.rsplit(".")[-1] in SUPPORTED_FILE_TYPES:
                 if file.changetype == Models.ChangeEnum.RENAMED:
-                    try:
-                        self.filesMapping.rename(file.source, file.target)
-                    except KeyError:
-                        print(f"! WARNING ! rename file source not found. "
-                              f"{commit.sha}: {file.source}->{file.target}")
-                        raise
+                    if file.source.rsplit(".")[-1] in SUPPORTED_FILE_TYPES:
+                        try:
+                            self.filesMapping.rename(file.source, file.target)
+                        except KeyError:
+                            print(f"! WARNING ! rename file source not found. "
+                                  f"{commit.sha}: {file.source}->{file.target}")
+                            raise
+                    else:
+                        objId = self.filesMapping[file.target]
                 else:
                     objId = self.filesMapping[file.target]
                     if file.changetype == Models.ChangeEnum.DELETED:
