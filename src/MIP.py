@@ -6,7 +6,7 @@ Created on Jun 7, 2015
 Edited: Aug-Sep, 2018
 @editors: Uriel, Mendi
 '''
-from itertools import permutations
+from itertools import permutations, chain
 import math
 from DataModule.models import ChangeEnum
 from pyutils.my_sorted import MySorted
@@ -19,6 +19,7 @@ USER_DECAY = 1.0
 GAMMA = 0.2
 BETA = 0.6
 ALPHA = 0.2
+
 
 class Mip:
     """
@@ -120,7 +121,7 @@ class Mip:
                 att = self.mip[user_node][n]
                 att['weight'] = max(0, att['weight'] - self.userDecay)  # decay for objects the user didn't interact with in the session
                 if self.mip.nodes[n]['deleted'] == True and self.mip.degree(n, weight='weight') == 0:
-                    to_remove.add(n) # if an object is deleted and weight of all connected edges is 0 - delete the node from graph
+                    to_remove.add(n)  # if an object is deleted and weight of all connected edges is 0 - delete the node from graph
 
         if to_remove: print("--------- nodes deleted ------------")
         for n in to_remove:
@@ -136,7 +137,6 @@ class Mip:
                     'lastKnown': self.iteration,
                     }
             self.mip.add_edge(i1, i2, **attr)
-
 
     def simpleProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
         sharedWeight = 0.0
@@ -193,32 +193,47 @@ class Mip:
         return filter(lambda ao: self.mip.nodes[ao[0]]['revisions'][-1] > time, self.rankObjects(user))
 
     def drawMip(self):
-        nx.draw(self.mip)
-        plt.savefig("path.png")
+        userNcolor = 'y'
+        userNshape = 's'
+        objNcolor = 'r'
+        objNShape = 'o'
+        layout = nx.circular_layout(self.mip)  # pick graph layout
 
+        
+        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=self.nodeIDsToUsersIds.keys(),
+            node_color=userNcolor, node_shape=userNshape)
+        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=self.nodeIDsToObjectsIds.keys(),
+            node_color=objNcolor, node_shape=objNShape)
+        nx.draw_networkx_labels(self.mip,layout,labels={**self.nodeIDsToUsersIds, **self.nodeIDsToObjectsIds})
+        labels = {(edge[0],edge[1]): edge[2]['weight'] for edge in self.mip.edges(data=True)}
+        nx.draw_networkx_edges(self.mip, pos=layout)
+        nx.draw_networkx_edge_labels(self.mip, pos=layout, edge_labels=labels)
+
+        plt.savefig("path.png")
+        #atom
     def __str__(self):
         return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}"
 
-    def createNodeLabels(self, nodeTypes='both'):
-        labels = {}
-        for node, data in self.mip.nodes(data=True):
-            if data['node_type'] == 'user':
-                if nodeTypes == 'user' or nodeTypes == 'both':
-                    labels[node] = 'u' + self.nodeIDsToUsersIds[node]
-            elif nodeTypes == 'object' or nodeTypes == 'both':
-                labels[node] = 'o' + self.nodeIDsToObjectsIds[node]
-        return labels
-
-    def createEdgeLabels(self, nbunch=None):  # for network vidsualization
-        labels = {}
-        if nbunch is None:
-            nbunch = self.mip.nodes()
-        for n1, n2, data in self.mip.edges(data=True):
-            if n1 in nbunch and n2 in nbunch:
-                edge = (n1, n2)
-                if data['weight'] > 0:
-                    labels[edge] = data['weight']
-        return labels
+    # def createNodeLabels(self, nodeTypes='both'):
+    #     labels = {}
+    #     for node, data in self.mip.nodes(data=True):
+    #         if data['node_type'] == 'user':
+    #             if nodeTypes == 'user' or nodeTypes == 'both':
+    #                 labels[node] = 'u' + self.nodeIDsToUsersIds[node]
+    #         elif nodeTypes == 'object' or nodeTypes == 'both':
+    #             labels[node] = 'o' + self.nodeIDsToObjectsIds[node]
+    #     return labels
+    #
+    # def createEdgeLabels(self, nbunch=None):  # for network vidsualization
+    #     labels = {}
+    #     if nbunch is None:
+    #         nbunch = self.mip.nodes()
+    #     for n1, n2, data in self.mip.edges(data=True):
+    #         if n1 in nbunch and n2 in nbunch:
+    #             edge = (n1, n2)
+    #             if data['weight'] > 0:
+    #                 labels[edge] = data['weight']
+    #     return labels
 
 
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-from scipy.optimize import minimize, Bounds, LinearConstraint
+from scipy.optimize import minimize, Bounds
 from src.MIP import Mip
 from numpy import array
 from CSR import CsrFiles
@@ -9,7 +9,7 @@ from DataModule.models import ChangeEnum
 
 
 def verbose_print(s):
-    pass  # print(s)
+     print(s)
 
 
 def eval_func(x, *args) -> float:
@@ -20,12 +20,14 @@ def eval_func(x, *args) -> float:
         verbose_print(f"for repo: {repo.name}")
         mip[i].set_params(*x)
         score.append(0.0)
+        total_doi = 0.0
         t = pt(['user', 'score', 'top 3', 'top 5', 'top 10', 'total_objects'])
         for commit_i, commit in enumerate(repo, 1):
             session = csr[i].commit_to_session(commit)
-            objects = set(session.get_session_objects(ChangeEnum.MODIFIED))
+            objects = session.get_session_objects(ChangeEnum.MODIFIED)
             pred_hits = []
-            total_doi = 0.0
+            for ao in session.actions:
+                verbose_print(ao)
 
             for pred_o, pred_doi in mip[i].rankObjects(session.user):
                 total_doi += pred_doi
@@ -39,9 +41,9 @@ def eval_func(x, *args) -> float:
             top_5 = sum(pred_hits[:5]) if len(pred_hits) >= 5 else -1
             top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else -1
             #            top_all = sum(pred_hits)
-            score[-1] /= total_doi
-            t.add_row([session.user.split('@', 1)[0], score[-1], top_3, top_5, top_10, len(objects)])
+            t.add_row([session.user.split('@', 1)[0], score[-1] / total_doi, top_3, top_5, top_10, len(objects)])
             mip[i].updateMIP(session)
+        score[-1] /= total_doi
         verbose_print(t)
         verbose_print(f"score for repo is: {score[-1]}")
 
@@ -60,12 +62,11 @@ if __name__ == "__main__":
         mip_models.append(Mip(f"{repo.name}"))
         csr_models.append(CsrFiles())
         for commit in repo:
-            print(f"    files: {len(commit.files)}")
+            # print(f"    files: {len(commit.files)}")
             mip_models[-1].updateMIP(csr_models[-1].commit_to_session(commit))
 
     x0 = array((0.2, 0.6, 0.2, 1.0, 1.0))
-    A = LinearConstraint(array((1,1,1,0,0)), 1, 1)
     y = list(p.Y)
-    res = minimize(eval_func, x0, (mip_models, csr_models), bounds=Bounds(0, 10), constraints=A)
+    res = minimize(eval_func, x0, (mip_models, csr_models), bounds=Bounds(0, 10))
 
     print(res)

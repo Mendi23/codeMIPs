@@ -1,4 +1,4 @@
-# urielha/heapdict
+urielha/heapdict
 # urielha/SimpleObjectAppender
 # _local_/CodeMIPs
 
@@ -22,7 +22,7 @@
 # videolan/vlc
 # tensorflow/tensorflow
 # nginx/nginx
-electron/electron
+# electron/electron
 # bitcoin/bitcoin
 # google/protobuf
 # mozilla/gecko-dev
