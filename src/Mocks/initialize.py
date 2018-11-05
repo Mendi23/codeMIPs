@@ -13,12 +13,14 @@ if __name__ == "__main__":
     csr = CsrFiles()
     p = Provider(0.8, repo)
     result_folder = path.join(RESULTS_DIR,repo.split('/')[-1])
-    mkdir(result_folder)
+    if not path.exists(result_folder):
+        mkdir(result_folder)
 
     for i, commit in enumerate(p.X):
         mip.updateMIP(csr.commit_to_session(commit))
 
     for j, commit in enumerate(p.Y, i):
+        plt.figure(clear=True)
         mip.drawMip()
         plt.suptitle(f"graph before commit {j}", fontsize=14, fontweight='bold')
 
@@ -40,5 +42,6 @@ if __name__ == "__main__":
         top_10 = sum(pred_hits[:10]) if len(pred_hits) >= 10 else -1
         top_5 = sum(pred_hits[:5]) if len(pred_hits) >= 5 else -1
         top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else -1
+        plt.figlegend()
         plt.savefig(path.join(result_folder, str(j)))
         mip.updateMIP(session)
