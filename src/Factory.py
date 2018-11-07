@@ -38,9 +38,6 @@ class Repo:
 
 class Provider:
     def __init__(self, ratio, repo=None):
-        """
-        IMPORTANT: Assuming the caller will consume the X before consuming Y.
-        """
         self.ratio = ratio
         self.data_extractors = {}
         if repo is not None:
@@ -82,12 +79,16 @@ class Provider:
 
 if __name__ == '__main__':
     p = Provider(0.8)
+    print("TRAIN:")
     for repo in p.X:
-        print(f"processing repo {repo.name}")
-        for commit in repo:
-            print((commit.sha, commit.message))
+        print(f" processing repo {repo.name}")
+        print(f" number of commits: {sum(1 for _ in repo)}")
+        # for commit in repo:
+        #     print((commit.sha, commit.message))
 
+    print("TEST:")
     for repo in p.Y:
-        print(f"processing repo {repo.name}")
-        for commit in repo:
-            print((commit.sha, commit.message))
+        print(f" processing repo {repo.name}")
+        print(f" number of commits: {sum(1 for _ in repo)}")
+        # for commit in repo:
+        #     print((commit.sha, commit.message))

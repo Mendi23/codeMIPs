@@ -82,7 +82,6 @@ class GithubQuery:
 
 
 class DataExtractor:
-
     def __init__(self, savedir, repouri, ratio=None, k_commits=None):
         self.ratio = ratio if ratio is not None else 0.75
         self.k_commits = k_commits if k_commits is not None else -1
@@ -143,13 +142,16 @@ class DataExtractor:
             cobj = self._create_commit(commit)
 
             # ~~~~~~~~~ save patches mapping ~~~~~~~~~~~~~~~~
-            # `git show` doesn't show merges details so here we had to
-            # give it a 2-commits diff to show (unless it is the first commit)
-            show_str = f"{commit.parents[0]}..{commit}" if commit.parents else commit
-            patch_by_files = PatchSet(query.repo.git.show(show_str, first_parent=True))
-            pfiles: Dict[str, PatchedFile] = {
-                pf.path: pf for pf in patch_by_files
-            }
+            if Models.Patch.SERIALIZE_CONTENT:
+                # `git show` doesn't show merges details so here we had to
+                # give it a 2-commits diff to show (unless it is the first commit)
+                show_str = f"{commit.parents[0]}..{commit}" if commit.parents else commit
+                patch_by_files = PatchSet(query.repo.git.show(show_str, first_parent=True))
+                pfiles: Dict[str, PatchedFile] = {
+                    pf.path: pf for pf in patch_by_files
+                }
+            else:
+                pfiles = {}
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             # ~~~~~~~~~ convert the stats ~~~~~~~~~~~~~~~~
@@ -185,13 +187,14 @@ class DataExtractor:
 
         # -> fetch the patches and convert
         patches = []
-        if source in pfiles:
-            self._fill_patches(patches, pfiles[source])
-            if changetype != Models.ChangeEnum.RENAMED:
-                changetype = Models.ChangeEnum_fromdescriptor(pfiles[source])
+        if Models.Patch.SERIALIZE_CONTENT:
+            if source in pfiles:
+                self._fill_patches(patches, pfiles[source])
+                if changetype != Models.ChangeEnum.RENAMED:
+                    changetype = Models.ChangeEnum_fromdescriptor(pfiles[source])
 
-        if DEBUG_1 and len(patches) == 0 and changetype != Models.ChangeEnum.RENAMED:
-            print(f"{commit_sha}: filename: {fname}, got none patches.")
+            if DEBUG_1 and len(patches) == 0 and changetype != Models.ChangeEnum.RENAMED:
+                print(f"{commit_sha}: filename: {fname}, got none patches.")
         # ---
 
         # -> creating file changeset

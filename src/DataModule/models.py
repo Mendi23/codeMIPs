@@ -72,11 +72,12 @@ class User(Base):
 
     def __eq__(self, other):
         return (
-            other != None and
-            isinstance(other, self.__class__) and
-            self.name == other.name and
-            self.email == other.email
+                other != None and
+                isinstance(other, self.__class__) and
+                self.name == other.name and
+                self.email == other.email
         )
+
 
 class Commit(Base):
     def __init__(self):
@@ -131,7 +132,7 @@ class FileChangeset(Base):
         self.source = ""
         self.target = ""
         self.changetype = ChangeEnum.MODIFIED
-        self.patches = None
+        self.patches: List[Patch] = []
 
     def __eq__(self, other):
         return self.changetype == other.changetype
@@ -148,8 +149,16 @@ class FileChangeset(Base):
     def _hooks(self):
         self.changetype = ChangeEnum_fromtype(self.changetype)
 
+        # Warning for cache
+        if (Patch.SERIALIZE_CONTENT and
+                self.changetype != ChangeEnum.RENAMED and
+                len([p for p in self.patches if p.target_lines or p.source_lines]) == 0):
+            print("WARNING: it seems like you want to load file contents but "
+                  "you have old cache with no file contents")
+
 
 class Patch(Base):
+    SERIALIZE_CONTENT = False
     def __init__(self):
         super().__init__()
         self.section_header = None
@@ -158,15 +167,13 @@ class Patch(Base):
 
     def serialize(self):
         d = super().serialize()
-        # d["source_lines"] = []
-        # d["target_lines"] = []
-        # return d
         d["source_lines"] = _encode_string(json.dumps(self.source_lines))
         d["target_lines"] = _encode_string(json.dumps(self.target_lines))
         return d
 
     def _hooks(self):
-        self.source_lines = self.target_lines = ""
-        return
-        self.source_lines = json.loads(_decode_string(self.source_lines))
-        self.target_lines = json.loads(_decode_string(self.target_lines))
+        if Patch.SERIALIZE_CONTENT:
+            self.source_lines = json.loads(_decode_string(self.source_lines))
+            self.target_lines = json.loads(_decode_string(self.target_lines))
+        else:
+            self.source_lines = self.target_lines = []

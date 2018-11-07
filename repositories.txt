@@ -1,7 +1,9 @@
-urielha/heapdict
+## only for testings: ##############
+# urielha/heapdict
 # urielha/SimpleObjectAppender
 # _local_/CodeMIPs
-
+# urielha/log4stash
+###################################
 
 # TheAlgorithms/C-Plus-Plus
 # TheAlgorithms/C
@@ -10,7 +12,7 @@ urielha/heapdict
 # stedolan/jq
 
 ## MED SIZE:
-# Microsoft/DirectXShaderCompiler
+# TOO MUCH FILES # Microsoft/DirectXShaderCompiler
 # mozilla/DeepSpeech
 # Alexpux/mingw-w64
 # nodemcu/nodemcu-firmware
