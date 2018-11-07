@@ -3,9 +3,10 @@ Created on Jun 7, 2015
 
 @author: Ofra
 
-Edited: Aug-Sep, 2018
+Edited: Aug-nov, 2018
 @editors: Uriel, Mendi
 '''
+
 from itertools import permutations
 import math
 from DataModule.models import ChangeEnum
@@ -21,42 +22,60 @@ ALPHA = 0.2
 
 
 class Mip:
-    """
-    @:param model_name (optinal)
-    @:param alpha, beta, gamma - weights for computing distance to object. s.t. alpha+beta+gama = 1
-    @:param user_decay, object_decay
-    """
-
-    def __init__(self, model_name=None, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY):
+    def __init__(self, model_name=None, alpha=ALPHA, beta=BETA, gamma=GAMMA,
+                 user_decay=USER_DECAY, object_decay=OBJECT_DECAY):
+        """
+        :param model_name (optinal)
+        :param alpha, beta, gamma - weights for computing distance to object.
+        s.t. alpha+beta+gama = 1
+        :param user_decay, object_decay - decay factors
+        """
         self.mip = nx.Graph()  # the representation of the MIP-Net network
-        self.users = {}  # user ids
-        self.objects = {}  # object ids
-        self.nodeIDsToObjectsIds = {}  # dictionary mapping between ids of nodes and object ids
-        self.nodeIDsToUsersIds = {}  # dictionary mapping between ids of nodes and user ids
+        self.users = {}  # mapping user_id -> node_id
+        self.objects = {}  # mapping object -> node_id
+        self.nodeIDsToObjectsIds = {}  # mapping node_id  -> object_id
+        self.nodeIDsToUsersIds = {}  # mapping node_id  -> user_id
 
         self.iteration = 0  # counter for sessions omitted to graph
         self.lastID = -1  # integer id for nodes
         self.name = model_name  # for referencing
-        self.centrality = None
+        self.centrality = None  # computed when when value is needed for DOI.
 
         self.set_params(alpha, beta, gamma, user_decay, object_decay)
 
-    def set_params(self, alpha=ALPHA, beta=BETA, gamma=GAMMA, user_decay=USER_DECAY, object_decay=OBJECT_DECAY):
-        self.alpha = alpha  # weight given to the global importance (centrality) of the object
-        self.beta = beta  # weight given to the proximity between the user and the object
-        self.gamma = gamma  # weight given to the extent of change
+    def set_params(self, alpha=ALPHA, beta=BETA, gamma=GAMMA,
+                   user_decay=USER_DECAY, object_decay=OBJECT_DECAY):
+        """
+        :param alpha: weight of the global importance (centrality) of the object
+        :param beta: weight of the proximity between the user and the object
+        :param gamma: weight given to the changes since the user last visit
+        :param user_decay: decay factor for u-ao edges
+        :param object_decay: decay factor for ao-ao edges
+        """
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
         self.userDecay = user_decay
         self.objectDecay = object_decay
 
-    def getLiveAos(self, userID=None):
+    def getLiveAos(self, userNodeID=None):
         """
-        :param userID: if not none, only return live object connected to that user.
+        :param userNodeID: only return live object connected to user (if not none)
         :return: list of mip nodes id that represent live object
         """
-        nodes = self.mip.nodes if userID is None else self.mip.neighbors(userID)
-        return [n for n in nodes if self.mip.nodes[n]['node_type'] == 'object' and self.mip.nodes[n]['deleted'] == False]
+        nodes = self.mip.nodes if userNodeID is None \
+            else self.mip.neighbors(userNodeID)
+
+        return [n for n in nodes if self.mip.nodes[n]['node_type'] == 'object' \
+                and self.mip.nodes[n]['deleted'] == False]
 
     def _addUser(self, user_name):
+        """
+        adding new user to the mip-graph
+        if user exist, doesn't do anything
+        :param user_name:
+        :return: the user's node id
+        """
         if user_name not in self.users:
             self.lastID += 1
             self.users[user_name] = self.lastID
@@ -67,6 +86,12 @@ class Mip:
         return self.users[user_name]
 
     def _addObject(self, object_id):
+        """
+        adding object user to the mip-graph
+        if object exist, doesn't do anything
+        :param object_id:
+        :return: the object's node id
+        """
         if object_id not in self.objects:
             self.lastID += 1
             self.objects[object_id] = self.lastID
@@ -78,160 +103,232 @@ class Mip:
             self.nodeIDsToObjectsIds[self.lastID] = object_id
         return self.objects[object_id]
 
-    def getObjectId(self, id):
-        return self.objects[id]
+    def getObjectNode(self, ao_id):
+        return self.objects[ao_id]
 
-    def getUserId(self, id):
-        return self.users[id]
+    def getUserNode(self, user_id):
+        return self.users[user_id]
 
     def updateMIP(self, session):
+        """
+        the heart and soul of the nodel. transform a session-object containing
+        the fields:
+            user - the user id
+            actions - iterable of action-object containing the fields:
+                ao - object id
+                actType - type ChangeEnum
+                weightInc - action weight
+        see Entities.py for more info
+        """
         self.iteration += 1
-        self.centrality = None
+        self.centrality = None  # centrality values will change after the update
         user = session.user
+
         user_node = self._addUser(user)
         user_att = self.mip.nodes[user_node]
+
         user_att['last_visit'] = self.iteration
 
         changedAOs = {}
         for act in session.actions:
             ao_node = self._addObject(act.ao)
             ao_att = self.mip.nodes[ao_node]
-            ao_att['deleted'] = (act.actType == ChangeEnum.DELETED)  # label deleted objects as deleted
 
-            assert ao_node not in changedAOs, "assuming only one action per object in one session"
+            # label deleted objects as deleted
+            ao_att['deleted'] = (act.actType == ChangeEnum.DELETED)
+
+            assert ao_node not in changedAOs, \
+                "assuming only one action per object in one session"
+
             ao_att['revisions'].append(self.iteration)  # add revision.
             changedAOs[ao_node] = act.weightInc
-            self.updateEdge(user_node, ao_node, 'u-ao', act.weightInc)  # adding weights to edge between user and object
+            # adding weights to edge between user and object
+            self._updateEdge(user_node, ao_node, 'u-ao', act.weightInc)
 
-        # adding weights to edge between two objects that appear in session (total added to : weightInc of both objects)
+        # adding weights to edge between two objects that appear in session
+        # (total added is : sum of weightInc of both objects)
         for node1, node2 in permutations(changedAOs, 2):
-            self.updateEdge(node1, node2, 'ao-ao', changedAOs[node1])
+            self._updateEdge(node1, node2, 'ao-ao', changedAOs[node1])
 
-        # decay for edges between objects that only one of them in session
+        # decay for edges between objects which only one of them is in session
         for node1, node2, att in self.mip.edges(changedAOs, data=True):
-            if att['edge_type'] == 'ao-ao' and (node1 not in changedAOs or node2 not in changedAOs):
+            if att['edge_type'] == 'ao-ao' and \
+                    (node1 not in changedAOs or node2 not in changedAOs):
                 att['weight'] = max(0, att['weight'] - self.objectDecay)
 
-        to_remove = set()
+        to_remove = list()
         for n in self.mip.neighbors(user_node):
             if n not in changedAOs:
                 att = self.mip[user_node][n]
-                att['weight'] = max(0, att['weight'] - self.userDecay)  # decay for objects the user didn't interact with in the session
-                if self.mip.nodes[n]['deleted'] == True and self.mip.degree(n, weight='weight') == 0:
-                    to_remove.add(n)  # if an object is deleted and weight of all connected edges is 0 - delete the node from graph
+                # decay for objects the user didn't interact with in the session
+                att['weight'] = max(0, att['weight'] - self.userDecay)
+                # if an object is deleted and weight of all connected edges is 0
+                # - delete the node from graph
+                if self.mip.nodes[n]['deleted'] == True and \
+                        self.mip.degree(n, weight='weight') == 0:
+                    to_remove.append(n)
 
-        # if to_remove: print("--------- nodes deleted ------------")
         for n in to_remove:
             self.mip.remove_node(n)
 
-    def updateEdge(self, i1, i2, edge_type, increment=1.0):
+    def _updateEdge(self, i1, i2, edge_type, increment=1.0):
         if self.mip.has_edge(i1, i2):
             self.mip[i1][i2]['weight'] += increment
-            self.mip[i1][i2]['lastKnown'] = self.iteration  # update last time user knew about object
-        else:
+            # update last time user knew about object
+            self.mip[i1][i2]['lastKnown'] = self.iteration
+        else:  # this is the first interaction between user and object
             attr = {'edge_type': edge_type,
                     'weight': increment,
                     'lastKnown': self.iteration,
                     }
             self.mip.add_edge(i1, i2, **attr)
 
-    def simpleProximity(self, s, t):  # s and t are the mip node IDs, NOT user/obj ids
+    def _simpleProximity(self, s, t):
         sharedWeight = 0.0
         for node in nx.common_neighbors(self.mip, s, t):
-            sharedWeight += self.mip[s][node]['weight'] + self.mip[t][node]['weight']  # the weight of the path connecting s and t through the current node
+            # the weight of the path connecting s and t through the current node
+            sharedWeight += self.mip[s][node]['weight'] + self.mip[t][node]['weight']
         if math.isclose(sharedWeight, 0, abs_tol=1e-09): return 0.0
-        return sharedWeight / (self.mip.degree(s, weight='weight') + self.mip.degree(t, weight='weight'))
+        denominator = self.mip.degree(s, weight='weight') + \
+                      self.mip.degree(t, weight='weight')
+        return sharedWeight / denominator
 
-    def DegreeOfInterestMIPs(self, user, obj):
+    def DegreeOfInterestMIPs(self, userId, aoNode):
         """
-        Computes degree of interest between a user and an object
-        gets as input the user id (might not yet be represented in mip) and obj node from MIP (not id)
+        Compute degree of interest between user and object in the graph
+        :param userId: user_id (might not yet be represented in mip)
+        :param aoNode: object_node id
+        :return: DOI(user,obj)
         """
-        if self.centrality is None:
+        if self.centrality is None:  # graph has changes since last computed
             self.centrality = nx.degree_centrality(self.mip)
 
         api_obj = 0.0
         if self.alpha > 0:
-            api_obj = self.centrality[obj]  # node centrality (apriori component)
+            api_obj = self.centrality[aoNode]
 
         proximity = 0.0
-        if self.beta > 0 and user in self.users:
-            proximity = self.simpleProximity(self.users[user], obj)
+        if self.beta > 0 and userId in self.users:
+            proximity = self._simpleProximity(self.users[userId], aoNode)
 
-        changeExtent = 0.0  # need to consider how frequently the object has been changed since user last known about it: user is userId (might not be in MIP), obj is object Node id
+        changeExtent = 0.0
         if self.gamma > 0:
-            changeExtent = self.changeExtent(user, obj)
+            changeExtent = self._changeExtent(userId, aoNode)
 
         return self.alpha * api_obj + self.beta * proximity + self.gamma * changeExtent
 
-    def changeExtent(self, userId, aoNode):
+    def _changeExtent(self, userId, aoNode):
         """
-        computes the extent/frequency to which an object was changed since the last time the user was notified about it
-        will be a component taken into account in degree of interest
+        computes the extent/frequency to which an object was changed since
+        the last time the user visited it.
+        :param userId: user_id (might not yet be represented in mip)
+        :param aoNode: object_node id
+        :return: changeExtent(user,ao)
         """
-        fromRevision = 1  # in case user does not exist yet or has never known about this object, start from revision 0
+        # in case user does not exist yet or has never known about this object,
+        # start from the first iteration
+        fromRevision = 1
         if userId in self.users and self.mip.has_edge(self.users[userId], aoNode):
             userNode = self.users[userId]
-            fromRevision = self.mip[userNode][aoNode]['lastKnown']  # get the last time the user knew what the value of the object was
+            # get the last time the user knew what the value of the object was
+            fromRevision = self.mip[userNode][aoNode]['lastKnown']
 
         revs = self.mip.nodes[aoNode]['revisions']
         numOfChanges = len(revs) - revs.index(fromRevision)
+
         return 0.0 if self.iteration == fromRevision \
             else numOfChanges / float(self.iteration - fromRevision)
 
     def rankObjects(self, user):
-        nodesRanked = sorted(self._getObjectsDOI(user).items(), key=lambda x: x[1], reverse=True)
+        """
+        :param user:
+        :return: iterator of tuples (object_id, doi) of all object's in the graph
+        sorted by the DOI of the user
+        """
+        nodesRanked = sorted(self._getObjectsDOI(user).items(),
+            key=lambda x: x[1], reverse=True)
+
         return ((self.nodeIDsToObjectsIds[x[0]], x[1]) for x in nodesRanked)
-        # return sorted(((self.nodeIDsToObjectsIds[x[0]],x[1]) for x in self._getObjectNodes(user)),
-        #     key=lambda x: x[1], reverse=True)
 
     def rankChanged(self, user, time=-1):
+        """
+        :param user:
+        :param time: if time=-1, return object's since the users' last visit
+        :return: iterator of tuples (object_id, doi) of all object's since 'time'
+        sorted by the DOI of the user
+        """
         if user in self.users and time == -1:
             time = self.mip.nodes[self.users[user]]['last_visit']
-        return filter(lambda ao: self.mip.nodes[ao[0]]['revisions'][-1] > time, self.rankObjects(user))
+
+        return filter(lambda ao: self.mip.nodes[ao[0]]['revisions'][-1] > time,
+            self.rankObjects(user))
 
     def _getObjectsDOI(self, user):
         return {ao: self.DegreeOfInterestMIPs(user, ao) for ao in self.getLiveAos()}
 
     def drawMip(self, file_path, user_focus, objects_focus):
         """
-        node size represent it's (weighted) rank
-        node color reprent it's proximity
+        saves an image of the *sub-graph* composed from a selected user, a group
+        of objects, and all of their neighbours.
+        :param file_path: where to save the graph
+        :param user_focus: the user which the DOI is in relation to
+        :param objects_focus: objects in this list will be highlighted in the graph
         """
+
         userNcolor = 'b'
         userNshape = '^'
         focususerNshape = 's'
         objNshape = 'o'
-        userLsize = 6
-        objLsize = 10
+        nodeLsize = 6
         objNcmap = plt.cm.get_cmap("autumn")
 
-        objects, objNcolor = zip(*self._getObjectsDOI(user_focus).items())
-        object_focus_nodes = [self.objects[x] for x in objects_focus]
-        objNline = [3.0 if x in object_focus_nodes else 1.0 for x in objects]
-
         user_node = self._addUser(user_focus)
-        nodes = [x for x in self.nodeIDsToUsersIds.keys() if x is not user_node]
-
-        layout = nx.circular_layout(self.mip)  # pick graph layout
+        object_nodes = [self._addObject(x) for x in objects_focus]
+        subgraph = self.mip.subgraph(object_nodes + [user_node] +
+                                     list(self.mip.neighbors(user_node)))
 
         plt.figure(clear=True, frameon=False)
         plt.axis('off')
-        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=nodes,
-            node_color=userNcolor, node_shape=userNshape, label='user_node')
-        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=[user_node],
-            node_color=userNcolor, node_shape=focususerNshape, label='focus_user_node')
-        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=objects, node_color=objNcolor,
-            node_shape=objNshape, cmap=objNcmap, linewidths=objNline, edgecolors='black', label='object_node')
-        nx.draw_networkx_labels(self.mip, layout, labels=self.nodeIDsToUsersIds, font_size=userLsize)
-        nx.draw_networkx_labels(self.mip, layout, labels=self.nodeIDsToObjectsIds, font_size=objLsize)
+        layout = nx.shell_layout(subgraph)  # pick graph layout
 
-        labels = {(edge[0], edge[1]): edge[2]['weight'] for edge in self.mip.edges(data=True)}
-        nx.draw_networkx_edges(self.mip, pos=layout)
-        nx.draw_networkx_edge_labels(self.mip, pos=layout, edge_labels=labels)
+        objects = []
+        users = []
+        objNcolor = []  # will be computed as color map from DOI
+        objNline = []
+        lables = {}
+
+        for n in subgraph.nodes():
+            if subgraph.nodes[n]['node_type'] == 'user':
+                lables[n] = self.nodeIDsToUsersIds[n]
+                if n is not user_node:
+                    users.append(n)
+            else:
+                objects.append(n)
+                lables[n] = self.nodeIDsToObjectsIds[n]
+                objNcolor.append(self.DegreeOfInterestMIPs(user_focus, n))
+                objNline.append(3.0 if n in object_nodes else 1.0)
+
+        nx.draw_networkx_nodes(subgraph, pos=layout, nodelist=[user_node],
+            edgecolors='black', node_color=userNcolor,
+            node_shape=focususerNshape, label='focus_user_node')
+        nx.draw_networkx_nodes(subgraph, pos=layout, nodelist=users,
+            edgecolors='black', node_color=userNcolor,
+            node_shape=userNshape, label='user_node')
+        nx.draw_networkx_nodes(subgraph, pos=layout, nodelist=objects,
+            node_color=objNcolor, node_shape=objNshape, cmap=objNcmap,
+            linewidths=objNline, edgecolors='black', label='object_node')
+        nx.draw_networkx_labels(subgraph, pos=layout,
+            labels=lables, font_size=nodeLsize)
+
+        edges = {(edge[0], edge[1]): edge[2]['weight']
+                 for edge in subgraph.edges(data=True) if edge[2]['weight'] > 0}
+        nx.draw_networkx_edges(subgraph, pos=layout, label='edge_weight',
+            edgelist=edges.keys())
+        nx.draw_networkx_edge_labels(subgraph, pos=layout, edge_labels=edges)
 
         plt.figlegend()
-        plt.suptitle(f"graph before commit {self.iteration}", fontsize=14, fontweight='bold')
+        plt.suptitle(f"graph before commit {self.iteration}",
+            fontsize=14, fontweight='bold')
 
         plt.savefig(file_path)
         plt.close()
