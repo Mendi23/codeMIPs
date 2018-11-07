@@ -215,8 +215,8 @@ class Mip:
 
         layout = nx.circular_layout(self.mip)  # pick graph layout
 
-        plt.figure(clear=True)
-
+        plt.figure(clear=True, frameon=False)
+        plt.axis('off')
         nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=nodes,
             node_color=userNcolor, node_shape=userNshape, label='user_node')
         nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=[user_node],
@@ -234,6 +234,7 @@ class Mip:
         plt.suptitle(f"graph before commit {self.iteration}", fontsize=14, fontweight='bold')
 
         plt.savefig(file_path)
+        plt.close()
 
     def __str__(self):
         return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}"
