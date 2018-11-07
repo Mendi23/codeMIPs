@@ -20,7 +20,6 @@ BETA = 0.6
 ALPHA = 0.2
 
 
-
 class Mip:
     """
     @:param model_name (optinal)
@@ -181,7 +180,8 @@ class Mip:
             else numOfChanges / float(self.iteration - fromRevision)
 
     def rankObjects(self, user):
-        return sorted(self._getObjectsDOI(user).items(), key=lambda x: x[1], reverse=True)
+        nodesRanked = sorted(self._getObjectsDOI(user).items(), key=lambda x: x[1], reverse=True)
+        return ((self.nodeIDsToObjectsIds[x[0]], x[1]) for x in nodesRanked)
         # return sorted(((self.nodeIDsToObjectsIds[x[0]],x[1]) for x in self._getObjectNodes(user)),
         #     key=lambda x: x[1], reverse=True)
 
@@ -191,10 +191,9 @@ class Mip:
         return filter(lambda ao: self.mip.nodes[ao[0]]['revisions'][-1] > time, self.rankObjects(user))
 
     def _getObjectsDOI(self, user):
-        return {ao : self.DegreeOfInterestMIPs(user, ao) for ao in self.getLiveAos()}
-        #return ((ao, self.DegreeOfInterestMIPs(user, ao)) for ao in self.getLiveAos())
+        return {ao: self.DegreeOfInterestMIPs(user, ao) for ao in self.getLiveAos()}
 
-    def drawMip(self, user_focus):
+    def drawMip(self, file_path, user_focus, objects_focus):
         """
         node size represent it's (weighted) rank
         node color reprent it's proximity
@@ -202,52 +201,42 @@ class Mip:
         userNcolor = 'b'
         userNshape = '^'
         focususerNshape = 's'
-        objNcmap = plt.cm.get_cmap("autumn")
-        #objFull = self._getObjectsDOI(user_focus)
-        #objN, objNcolor = zip(*objFull.items())
-        objN, objNcolor = zip(*self._getObjectsDOI(user_focus).items())
         objNshape = 'o'
         userLsize = 6
         objLsize = 10
+        objNcmap = plt.cm.get_cmap("autumn")
+
+        objects, objNcolor = zip(*self._getObjectsDOI(user_focus).items())
+        object_focus_nodes = [self.objects[x] for x in objects_focus]
+        objNline = [3.0 if x in object_focus_nodes else 1.0 for x in objects]
+
         user_node = self._addUser(user_focus)
+        nodes = [x for x in self.nodeIDsToUsersIds.keys() if x is not user_node]
 
         layout = nx.circular_layout(self.mip)  # pick graph layout
-        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=self.nodeIDsToUsersIds.keys(),
+
+        plt.figure(clear=True)
+
+        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=nodes,
             node_color=userNcolor, node_shape=userNshape, label='user_node')
         nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=[user_node],
             node_color=userNcolor, node_shape=focususerNshape, label='focus_user_node')
-        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=objN,
-            node_color=objNcolor, node_shape=objNshape, cmap=objNcmap, label='object_node')
+        nx.draw_networkx_nodes(self.mip, pos=layout, nodelist=objects, node_color=objNcolor,
+            node_shape=objNshape, cmap=objNcmap, linewidths=objNline, edgecolors='black', label='object_node')
         nx.draw_networkx_labels(self.mip, layout, labels=self.nodeIDsToUsersIds, font_size=userLsize)
         nx.draw_networkx_labels(self.mip, layout, labels=self.nodeIDsToObjectsIds, font_size=objLsize)
-        #nx.draw_networkx_labels(self.mip, layout, labels=objFull, font_size=objLsize)
+
         labels = {(edge[0], edge[1]): edge[2]['weight'] for edge in self.mip.edges(data=True)}
         nx.draw_networkx_edges(self.mip, pos=layout)
         nx.draw_networkx_edge_labels(self.mip, pos=layout, edge_labels=labels)
 
+        plt.figlegend()
+        plt.suptitle(f"graph before commit {self.iteration}", fontsize=14, fontweight='bold')
+
+        plt.savefig(file_path)
+
     def __str__(self):
         return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}"
-
-    # def createNodeLabels(self, nodeTypes='both'):
-    #     labels = {}
-    #     for node, data in self.mip.nodes(data=True):
-    #         if data['node_type'] == 'user':
-    #             if nodeTypes == 'user' or nodeTypes == 'both':
-    #                 labels[node] = 'u' + self.nodeIDsToUsersIds[node]
-    #         elif nodeTypes == 'object' or nodeTypes == 'both':
-    #             labels[node] = 'o' + self.nodeIDsToObjectsIds[node]
-    #     return labels
-    #
-    # def createEdgeLabels(self, nbunch=None):  # for network vidsualization
-    #     labels = {}
-    #     if nbunch is None:
-    #         nbunch = self.mip.nodes()
-    #     for n1, n2, data in self.mip.edges(data=True):
-    #         if n1 in nbunch and n2 in nbunch:
-    #             edge = (n1, n2)
-    #             if data['weight'] > 0:
-    #                 labels[edge] = data['weight']
-    #     return labels
 
 
 if __name__ == '__main__':
