@@ -56,7 +56,6 @@ if __name__ == "__main__":
         for user in (u for u, v in users.items() if v > TOLERANCE):
             u_table = table[table["user"] == user]
             if u_table.empty: continue
-            print(u_table)
             plt.figure(clear=True)
             u_table.plot(kind='bar', x='commits', y='accuracy')
             filename = path.join(directory, f"{user}.png")
