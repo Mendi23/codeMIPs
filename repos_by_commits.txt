@@ -1,0 +1,24 @@
++---------------------------+---------+
+|            name           | commits |
++---------------------------+---------+
+| TheAlgorithms/C-Plus-Plus |   117   |
+|      TheAlgorithms/C      |   134   |
+|   fragglet/c-algorithms   |   230   |
+|  nodemcu/nodemcu-firmware |   319   |
+|     mozilla/DeepSpeech    |   497   |
+|       nlohmann/json       |   578   |
+|        stedolan/jq        |   992   |
+|       Microsoft/ELL       |   1091  |
+|      google/protobuf      |   1966  |
+|         mozilla/rr        |   4529  |
+|     Alexpux/mingw-w64     |   4739  |
+|     electron/electron     |   6263  |
+|        nginx/nginx        |   6455  |
+|      bitcoin/bitcoin      |   7396  |
+|          vim/vim          |   8987  |
+|   tensorflow/tensorflow   |  10895  |
+|     kripken/emscripten    |  11209  |
+|       torvalds/linux      |  55876  |
+|        videolan/vlc       |  78132  |
+|     mozilla/gecko-dev     |  349377 |
++---------------------------+---------+
