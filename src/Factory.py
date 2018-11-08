@@ -37,15 +37,17 @@ class Repo:
 
 
 class Provider:
-    def __init__(self, ratio, repo=None):
+    def __init__(self, ratio, repo=None, repos_file=None):
+        assert repo is None or repos_file is None
         self.ratio = ratio
         self.data_extractors = {}
         if repo is not None:
             self.X = [self._getTrain(repo)]
             self.Y = [self._getTest(repo)]
         else:
+            repos_file = repos_file or REPOSITORIES_LIST_FILE
             gen = (line.strip().split("#", 1)[0]
-                   for line in open(REPOSITORIES_LIST_FILE))
+                   for line in open(repos_file))
             repos = [repo for repo in gen if repo]
             print("Repositories:")
             for repo in repos:
