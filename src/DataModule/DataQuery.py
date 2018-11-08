@@ -13,7 +13,8 @@ from DataModule.utils import *
 
 from pyutils.file_paths import STORAGE_DIR
 
-CACHE_THE_DATA = True
+FETCH_REPO = False
+CACHE_THE_DATA = False
 DEBUG_1 = False
 
 PER_PAGE = 100
@@ -53,6 +54,10 @@ class GithubQuery:
         else:
             print(f"[DataQuery] - cloning repo: {repouri}..")
             ret.repo = Repo.clone_from(ret.uri, ret.storage, bare=True)
+
+        if FETCH_REPO:
+            print("[DataQuery] - fetch..")
+            ret.repo.remotes.origin.fetch(MASTER)
 
         print("[DataQuery] - ready!")
         return ret
