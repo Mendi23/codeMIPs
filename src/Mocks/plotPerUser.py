@@ -54,9 +54,11 @@ def process_repo(repo):
         u_table = table[table["user"] == user]
         if u_table.empty: continue
         plt.figure(clear=True)
-        u_table.plot(kind='line', x='commits', y='accuracy', figsize=(10, 6))
+        u_table.plot(kind='line', x='commits', y='accuracy',
+                     figsize=(10, 6), title=user)
         filename = path.join(directory, f"{user}.png")
         plt.savefig(filename)
+        plt.close()
 
 
 if __name__ == "__main__":
