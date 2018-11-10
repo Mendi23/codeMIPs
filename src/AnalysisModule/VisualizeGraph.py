@@ -1,3 +1,4 @@
+import sys
 from src.MIP import Mip
 from CSR import CsrFiles
 from Factory import Provider
@@ -7,16 +8,16 @@ from os import path, mkdir
 from pyutils.file_paths import RESULTS_DIR
 
 if __name__ == "__main__":
-    repo = "stedolan/jq"
-    mip = Mip()
+    repo = sys.argv[1]
+    mip = Mip(repo)
     csr = CsrFiles()
     p = Provider(0.8, repo)
 
-    result_folder = path.join(RESULTS_DIR,repo.split('/')[-1])
+    result_folder = path.join(RESULTS_DIR, repo.split('/')[-1])
     if not path.exists(result_folder):
         mkdir(result_folder)
 
-    table = pt(['commit', 'user', 'changed_objects', 'pred', 'score', 'top 3', 'top 5'])
+    table = pt(['commit', 'user', 'changed_objects', 'top 10 pred', 'score', 'top 3', 'top 5'])
 
     X, Y = p.X[0], p.Y[0]
 
@@ -24,11 +25,9 @@ if __name__ == "__main__":
         mip.updateMIP(csr.commit_to_session(commit))
 
     for j, commit in enumerate(Y, i):
-
         session = csr.commit_to_session(commit)
         objects = session.get_session_objects(ChangeEnum.MODIFIED)
         if len(objects) > 0:
-
             pred_hits = []
             score = 0.0
             total_doi = 0.0
@@ -42,14 +41,16 @@ if __name__ == "__main__":
                 else:
                     pred_hits.append(0)
 
-            top_5 = sum(pred_hits[:5]) if len(pred_hits) >= 5 else -1
-            top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else -1
-
+            top_5 = sum(pred_hits[:5]) if len(pred_hits) >= 5 else None
+            top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else None
 
             table.add_row([j, session.user.split('@', 1)[0],
-                           objects, mip_ranking, score/total_doi, top_3, top_5])
+                           objects, "\n".join(str(a) for a in mip_ranking[:10]),
+                           score / total_doi, top_3, top_5])
 
-            mip.drawMip(path.join(result_folder, str(j)), session.user, objects)
+            ranked = [a[0] for a in mip_ranking[:10]]
+
+            mip.drawMip(path.join(result_folder, str(j)), session.user, objects, ranked, False)
         mip.updateMIP(session)
 
     with open(path.join(result_folder, 'res.txt'), 'w') as f:

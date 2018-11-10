@@ -13,6 +13,7 @@ from DataModule.models import ChangeEnum
 from pyutils.my_sorted import MySorted
 import networkx as nx
 import matplotlib.pyplot as plt
+from numpy import array
 
 OBJECT_DECAY = 1.0
 USER_DECAY = 1.0
@@ -22,7 +23,7 @@ ALPHA = 0.2
 
 
 class Mip:
-    def __init__(self, model_name=None, alpha=ALPHA, beta=BETA, gamma=GAMMA,
+    def __init__(self, model_name='__', alpha=ALPHA, beta=BETA, gamma=GAMMA,
                  user_decay=USER_DECAY, object_decay=OBJECT_DECAY):
         """
         :param model_name (optinal)
@@ -200,22 +201,40 @@ class Mip:
         :param aoNode: object_node id
         :return: DOI(user,obj)
         """
+        # only compute id needed and multiplying by the weights
+        return (array([self.alpha, self.beta, self.gamma]) *
+               self.getDoiComponents(userId, aoNode,
+                   self.alpha > 0, self.beta > 0, self.gamma > 0)).sum()
+
+    def getDoiComponents(self, userId, aoNode,
+                         centrality=True, proximity=True, changeExtent=True):
+        """
+        if parameter is False, it's corresponding result will be 0
+        :param userId: user_id (might not yet be represented in mip)
+        :param aoNode:object_node id
+        :param centrality:
+        :param proximity:
+        :param changeExtent:
+        :return: np.array of (centrality,proximity,changeExtent)
+        """
+
+        assert self.mip.has_node(aoNode), 'aoNode must be a graph object node!'
+
         if self.centrality is None:  # graph has changes since last computed
             self.centrality = nx.degree_centrality(self.mip)
 
-        api_obj = 0.0
-        if self.alpha > 0:
-            api_obj = self.centrality[aoNode]
+        a1, a2, a3 = 0, 0, 0
 
-        proximity = 0.0
-        if self.beta > 0 and userId in self.users:
-            proximity = self._simpleProximity(self.users[userId], aoNode)
+        if centrality:
+            a1 = self.centrality[aoNode]
 
-        changeExtent = 0.0
-        if self.gamma > 0:
-            changeExtent = self._changeExtent(userId, aoNode)
+        if proximity and userId in self.users:
+            a2 = self._simpleProximity(self.users[userId], aoNode)
 
-        return self.alpha * api_obj + self.beta * proximity + self.gamma * changeExtent
+        if changeExtent:
+            a3 = self._changeExtent(userId, aoNode)
+
+        return array([a1, a2, a3])
 
     def _changeExtent(self, userId, aoNode):
         """
@@ -247,8 +266,8 @@ class Mip:
         """
         nodesRanked = sorted(self._getObjectsDOI(user).items(),
             key=lambda x: x[1], reverse=True)
-
-        return ((self.nodeIDsToObjectsIds[x[0]], x[1]) for x in nodesRanked)
+        return ((self.nodeIDsToObjectsIds[x[0]], float("{0:.3f}".format(x[1])))
+                for x in nodesRanked)
 
     def rankChanged(self, user, time=-1):
         """
@@ -266,13 +285,17 @@ class Mip:
     def _getObjectsDOI(self, user):
         return {ao: self.DegreeOfInterestMIPs(user, ao) for ao in self.getLiveAos()}
 
-    def drawMip(self, file_path, user_focus, objects_focus):
+    def drawMip(self, file_path, user_focus, objects_focus1, objects_focus2,
+                neighbours=True):
         """
-        saves an image of the *sub-graph* composed from a selected user, a group
-        of objects, and all of their neighbours.
+        saves an image of the *sub-graph* composed from a selected user and
+        a group of objects.
         :param file_path: where to save the graph
         :param user_focus: the user which the DOI is in relation to
-        :param objects_focus: objects in this list will be highlighted in the graph
+        :param objects_focus1: objects in this list will be highlighted in the graph
+        :param objects_focus2: objects in this list will be added to the graph
+        :param neighbours: weather to add the neighbours of the user_focus
+        in the Mip-graph to the subgraph.
         """
 
         userNcolor = 'b'
@@ -283,9 +306,12 @@ class Mip:
         objNcmap = plt.cm.get_cmap("autumn")
 
         user_node = self._addUser(user_focus)
-        object_nodes = [self._addObject(x) for x in objects_focus]
-        subgraph = self.mip.subgraph(object_nodes + [user_node] +
-                                     list(self.mip.neighbors(user_node)))
+        object_nodes = [self._addObject(x) for x in objects_focus1]
+        nodes = object_nodes + [user_node]
+        if neighbours:
+            nodes.extend(self.mip.neighbors(user_node))
+        nodes.extend(self._addObject(x) for x in objects_focus2)
+        subgraph = self.mip.subgraph(nodes)
 
         plt.figure(clear=True, frameon=False)
         plt.axis('off')
@@ -326,7 +352,8 @@ class Mip:
             edgelist=edges.keys())
         nx.draw_networkx_edge_labels(subgraph, pos=layout, edge_labels=edges)
 
-        plt.figlegend()
+        plt.legend()
+        plt.title(str(self))
         plt.suptitle(f"graph before commit {self.iteration}",
             fontsize=14, fontweight='bold')
 
@@ -334,7 +361,7 @@ class Mip:
         plt.close()
 
     def __str__(self):
-        return f"MIP_{self.alpha}_{self.beta}_{self.gamma}_{self.userDecay}_{self.objectDecay}"
+        return f"MIP_{self.name}__alpha={self.alpha}_beta={self.beta}_gamma={self.gamma}"
 
 
 if __name__ == '__main__':

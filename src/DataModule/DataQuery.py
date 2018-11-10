@@ -1,17 +1,11 @@
 import functools
-import itertools
 # import uritemplate, requests
-from functools import partial
 from os.path import join as pathjoin
 from typing import Dict, Iterator
 from urllib.parse import urljoin
-
 from git import Repo, Commit
 from unidiff import PatchedFile, PatchSet
-
 from DataModule.utils import *
-
-from pyutils.file_paths import STORAGE_DIR
 
 FETCH_REPO = False
 CACHE_THE_DATA = False
@@ -82,8 +76,8 @@ class GithubQuery:
             branch = f"{MASTER}~{start_from}..{MASTER}"
 
         return self.repo.iter_commits(branch,
-                                      first_parent=True,
-                                      reverse=True)
+            first_parent=True,
+            reverse=True)
 
 
 class DataExtractor:
@@ -107,11 +101,11 @@ class DataExtractor:
 
     def initialize_repo_storage(self, suffix=''):
         jsons_filename = pathjoin(self.storagedir,
-                                  Storage.get_valid_filename(self.repouri + suffix))
+            Storage.get_valid_filename(self.repouri + suffix))
 
         jsons_export = Storage.export_object_to_json_file
         jsons_import = functools.partial(Storage.import_objects_from_json_file,
-                                         decoder=Models.Commit.create)
+            decoder=Models.Commit.create)
         # noinspection PyTypeChecker
         storage = Storage(jsons_filename, PER_PAGE, jsons_export, jsons_import)
         return storage
@@ -241,4 +235,3 @@ class DataExtractor:
     @staticmethod
     def _build_path(path):
         return ("".join([s.strip(" {}") for s in path])).replace("//", "/")
-

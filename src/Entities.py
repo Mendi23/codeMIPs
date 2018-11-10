@@ -20,9 +20,10 @@ class Session:
         self.actions.append(action)
 
     def get_session_objects(self, action = None):
-        '''
+        """
+        :param action: if not None, filter only objects correspond to action
         :return: a list of object's modified in the session
-        '''
+        """
         return [a.ao for a in self.actions if action is None or a.actType == action]
 
     def __str__(self):
