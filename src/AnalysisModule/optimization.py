@@ -51,6 +51,7 @@ def eval_func(x, *args) -> float:
     verbose_print(f"--------------score is: {total}-------------------\n")
     return -total
 
+
 if __name__ == "__main__":
     p = Provider(0.8)
 

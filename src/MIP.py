@@ -10,7 +10,7 @@ Edited: Aug-nov, 2018
 from itertools import permutations
 import math
 from DataModule.models import ChangeEnum
-from pyutils.my_sorted import MySorted
+from pyutils.utils import MySorted, DOI
 import networkx as nx
 import matplotlib.pyplot as plt
 from numpy import array
@@ -234,7 +234,7 @@ class Mip:
         if changeExtent:
             a3 = self._changeExtent(userId, aoNode)
 
-        return array([a1, a2, a3])
+        return DOI(a1, a2, a3)
 
     def _changeExtent(self, userId, aoNode):
         """

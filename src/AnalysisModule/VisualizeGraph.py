@@ -4,23 +4,22 @@ from CSR import CsrFiles
 from Factory import Provider
 from prettytable import PrettyTable as pt
 from DataModule.models import ChangeEnum
-from os import path, mkdir
-from pyutils.file_paths import RESULTS_DIR
+from os import path
+from pyutils.file_paths import get_repo_result_dir
 
 if __name__ == "__main__":
     repo = sys.argv[1]
     mip = Mip(repo)
     csr = CsrFiles()
-    p = Provider(0.8, repo)
+    p = Provider(1, repo)
+    result_folder = get_repo_result_dir(repo, [mip.alpha, mip.beta, mip.gamma])
 
-    result_folder = path.join(RESULTS_DIR, repo.split('/')[-1])
-    if not path.exists(result_folder):
-        mkdir(result_folder)
-
-    table = pt(['commit', 'user', 'changed_objects', 'top 10 pred', 'score', 'top 3', 'top 5'])
+    table = pt(['commit', 'user', 'changed_objects', 'top 10 pred', 'score',
+                'top 3', 'top 5'])
 
     X, Y = p.X[0], p.Y[0]
 
+    i = 1
     for i, commit in enumerate(X, 1):
         mip.updateMIP(csr.commit_to_session(commit))
 
@@ -54,4 +53,4 @@ if __name__ == "__main__":
         mip.updateMIP(session)
 
     with open(path.join(result_folder, 'res.txt'), 'w') as f:
-        f.write(str(table))
+        f.write(table.get_string(title=str(mip)))
