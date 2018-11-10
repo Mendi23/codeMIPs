@@ -7,6 +7,10 @@ from enum import Enum
 
 from typing import List
 
+@functools.lru_cache(maxsize=None)
+def _print_once(s: str):
+    print(s)
+    return None
 
 def _encode_string(s: str) -> str:
     compressed = gzip.compress(str(s).encode())
@@ -153,12 +157,12 @@ class FileChangeset(Base):
         if (Patch.SERIALIZE_CONTENT and
                 self.changetype != ChangeEnum.RENAMED and
                 len([p for p in self.patches if p.target_lines or p.source_lines]) == 0):
-            print("WARNING: it seems like you want to load file contents but "
-                  "you have old cache with no file contents")
+            _print_once("WARNING: it seems like you want to load file contents but "
+                        "you have old cache with no file contents ")
 
 
 class Patch(Base):
-    SERIALIZE_CONTENT = False
+    SERIALIZE_CONTENT = True
     def __init__(self):
         super().__init__()
         self.section_header = None

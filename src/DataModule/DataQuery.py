@@ -1,5 +1,6 @@
 import functools
 # import uritemplate, requests
+from math import inf
 from os.path import join as pathjoin
 from typing import Dict, Iterator
 from urllib.parse import urljoin
@@ -8,7 +9,7 @@ from unidiff import PatchedFile, PatchSet
 from DataModule.utils import *
 
 FETCH_REPO = False
-CACHE_THE_DATA = False
+CACHE_THE_DATA = True
 DEBUG_1 = False
 
 PER_PAGE = 100
@@ -116,27 +117,27 @@ class DataExtractor:
         return self._iterate_commits(storage, until=until)
 
     def get_test(self) -> Iterable[Models.Commit]:
-        storage = self.initialize_repo_storage("_test")
+        storage = self.initialize_repo_storage()
         start_from = self.num_of_commits - self.first_slice
         return self._iterate_commits(storage, start_from=start_from)
 
     def load_commits(self, storage: Storage):
         return storage.load_all()
 
-    def _iterate_commits(self, storage: Storage, until=None, start_from=None):
+    def _iterate_commits(self, storage: Storage, until=inf, start_from=0):
         query: GithubQuery = self.query
 
         if CACHE_THE_DATA:
-            firsttime = True
-            for commit in self.load_commits(storage):
-                if firsttime:
-                    print("SOME OF THE DATA IS LOADED FROM CACHE!")
-                    firsttime = False
+            for i, commit in enumerate(self.load_commits(storage)):
+                if i == 0:
+                    print("SOME OF THE DATA WERE LOADED FROM CACHE!")
+                if until < i or i < start_from:
+                    continue
                 yield commit
         skip_n = storage.objects_count
 
-        for i, commit in enumerate(query.repo_iterate_commits(until, start_from)):
-            if i < skip_n: continue
+        for i, commit in enumerate(query.repo_iterate_commits()):
+            if i < skip_n or until < i or i < start_from: continue
 
             cobj = self._create_commit(commit)
 
