@@ -27,8 +27,8 @@ class ReusableGenerator(Generic[T]):
             self._gen = None
 
 
-class Repo:
-    def __init__(self, name, gen):
+class Repo(Generic[T]):
+    def __init__(self, name: str, gen: Iterable[T]):
         self.gen = gen
         self.name = name
 
