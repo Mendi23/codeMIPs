@@ -9,7 +9,7 @@ from pyutils.file_paths import get_repo_result_dir
 import pandas as pd
 
 def retreive_data(repo):
-    mip = Mip(f"{repo.name}")
+    mip = Mip(repo.name)
     csr = CsrFiles()
 
     data = {'user': [],

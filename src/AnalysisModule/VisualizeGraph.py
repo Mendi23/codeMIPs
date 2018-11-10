@@ -19,11 +19,11 @@ if __name__ == "__main__":
 
     X, Y = p.X[0], p.Y[0]
 
-    i = 1
-    for i, commit in enumerate(X, 1):
-        mip.updateMIP(csr.commit_to_session(commit))
+    # i = 1
+    # for i, commit in enumerate(X, 1):
+    #     mip.updateMIP(csr.commit_to_session(commit))
 
-    for j, commit in enumerate(Y, i):
+    for j, commit in enumerate(X, 1):
         session = csr.commit_to_session(commit)
         objects = session.get_session_objects(ChangeEnum.MODIFIED)
         if len(objects) > 0:
@@ -43,9 +43,11 @@ if __name__ == "__main__":
             top_5 = sum(pred_hits[:5]) if len(pred_hits) >= 5 else None
             top_3 = sum(pred_hits[:3]) if len(pred_hits) >= 3 else None
 
+            prop_score = 0.0 if score is 0.0 else score / total_doi #avoid devision by 0
+
             table.add_row([j, session.user.split('@', 1)[0],
                            objects, "\n".join(str(a) for a in mip_ranking[:10]),
-                           score / total_doi, top_3, top_5])
+                           prop_score, top_3, top_5])
 
             ranked = [a[0] for a in mip_ranking[:10]]
 
