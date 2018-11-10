@@ -1,5 +1,5 @@
 from collections import defaultdict, deque
-from os import path, mkdir
+from os import path
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,16 +7,10 @@ import matplotlib.pyplot as plt
 from CSR import CsrFiles, TooManyActionsError
 from DataModule.models import ChangeEnum
 from Factory import Provider
-from pyutils.file_paths import RESULTS_DIR
+from pyutils.file_paths import get_repo_result_dir
 from src.MIP import Mip
 
 TOLERANCE = 10
-
-def make_result_dir(repo):
-    result_folder = path.join(RESULTS_DIR, repo.split('/')[-1])
-    if not path.exists(result_folder):
-        mkdir(result_folder)
-    return result_folder
 
 
 def process_repo(repo):
@@ -24,7 +18,7 @@ def process_repo(repo):
     csr = CsrFiles()
     data = deque()
     users = defaultdict(int)
-    directory = make_result_dir(repo.name)
+    directory = get_repo_result_dir(repo.name, [mip.alpha, mip.beta, mip.gamma])
     for commit in repo:
         session = csr.commit_to_session(commit)
         objects = set(session.get_session_objects(ChangeEnum.MODIFIED))
@@ -54,8 +48,17 @@ def process_repo(repo):
         u_table = table[table["user"] == user]
         if u_table.empty: continue
         plt.figure(clear=True)
-        u_table.plot(kind='line', x='commits', y='accuracy',
-                     figsize=(10, 6), title=user)
+
+        ax = u_table.plot(
+            kind='line', x='commits', y='accuracy',
+            figsize=(10, 6),
+            title=f"Accuracy per commits | repo: {repo.name} | user: {user}",
+        )
+        ylabel = "MIP accuracy (doi/total_doi)"
+        xlabel = "Commit number (linear)"
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+
         filename = path.join(directory, f"{user}.png")
         plt.savefig(filename)
         plt.close()
