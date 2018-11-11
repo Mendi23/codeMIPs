@@ -162,7 +162,7 @@ class FileChangeset(Base):
 
 
 class Patch(Base):
-    SERIALIZE_CONTENT = True
+    SERIALIZE_CONTENT = False
     def __init__(self):
         super().__init__()
         self.section_header = None

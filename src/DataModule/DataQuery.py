@@ -21,9 +21,22 @@ BASE_URL = "https://github.com"
 
 class GithubQuery:
     """
-    This is your dragon handle to the mighty github!!!!
-    Oh poor user, you are about to see the full power of github on your tiny
-    programmer's hands.
+    Responsible for downloading the repository from Github
+    and store it on the local storage.
+
+    Usage:
+
+    ```python
+    query = GithubQuery.create(local_dir, repouri)
+    query.num_of_commits()
+    query.repo_iterate_commits()
+    ```
+
+    Params:
+     * **local_dir** - name of the local directory for download repositories
+       (the module will create subdirectory for each repo automaticlly so don't need to create directory for each repo)
+     * **repouri** - the repository uri i.e. "torvalds/linux"
+
     """
 
     def __init__(self):
@@ -36,7 +49,6 @@ class GithubQuery:
         """
         Create instance of GithubQuery.
         Cloning the repository to local storage if needed.
-        Fetch last version of the repository.
         :param repouri: repo uri name.
                         example: "mozilla/DeepSpeech" or KNOWN_SMALL_REPOS[6]
         """
@@ -60,28 +72,42 @@ class GithubQuery:
     def num_of_commits(self):
         return self.repo.branches.master.commit.count(first_parent=True)
 
-    def repo_iterate_commits(self, until=None, start_from=None) -> Iterator[Commit]:
+    def repo_iterate_commits(self) -> Iterator[Commit]:
         """
         Iterate over commits in "master" from the first (oldest) commit
         to the last.
         Excluding forks to other branches.
-        :param until - index from the END (i.e. until=1 is until 1 before the end)
-        :param start_from - index from the END
         """
-        assert until is None or start_from is None, "can't have both `until` and `start_from` set with value"
 
-        branch = MASTER
-        if until is not None:
-            branch = f"{MASTER}~{until}"
-        elif start_from is not None:
-            branch = f"{MASTER}~{start_from}..{MASTER}"
-
-        return self.repo.iter_commits(branch,
+        return self.repo.iter_commits(MASTER,
             first_parent=True,
             reverse=True)
 
 
 class DataExtractor:
+    """
+    This class is using the `GithubQuery` this class for downloading repos and:
+     * Parse each commit to a known object (will be explained below)
+     * Split to train/test (by ratio or explicit number)
+     * Cache the extracted data for fast using later
+
+    Usage:
+
+    ```python
+    data_extractor = DataExtractor(local_dir, repouri, ratio=0.8)
+    # or
+    data_extractor = DataExtractor(local_dir, repouri, k_commits=10)
+
+    X = data_extractor.get_train()
+    Y = data_extractor.get_test()
+    ```
+
+    Params:
+     * **local_dir** and **repouri** as explained above
+     * **ratio** - the ratio: (# train commits) / (# total commits)
+     * **k_commits** - k commits = number of **test** commits.
+
+    """
     def __init__(self, savedir, repouri, ratio=None, k_commits=None):
         self.ratio = ratio if ratio is not None else 0.75
         self.k_commits = k_commits if k_commits is not None else -1
@@ -113,31 +139,34 @@ class DataExtractor:
 
     def get_train(self) -> Iterable[Models.Commit]:
         storage = self.initialize_repo_storage()
-        until = self.num_of_commits - self.first_slice
-        return self._iterate_commits(storage, until=until)
+        return self._iterate_commits(storage, stop_at=self.first_slice)
 
     def get_test(self) -> Iterable[Models.Commit]:
         storage = self.initialize_repo_storage()
-        start_from = self.num_of_commits - self.first_slice
-        return self._iterate_commits(storage, start_from=start_from)
+        return self._iterate_commits(storage, start_from=self.first_slice)
 
     def load_commits(self, storage: Storage):
         return storage.load_all()
 
-    def _iterate_commits(self, storage: Storage, until=inf, start_from=0):
+    @staticmethod
+    def _in_bounds(i, start, end):
+        return start <= i < end
+
+    def _iterate_commits(self, storage: Storage, start_from=0, stop_at=inf):
         query: GithubQuery = self.query
 
+        skip_n = start_from
         if CACHE_THE_DATA:
             for i, commit in enumerate(self.load_commits(storage)):
                 if i == 0:
                     print("SOME OF THE DATA WERE LOADED FROM CACHE!")
-                if until < i or i < start_from:
+                if not self._in_bounds(i, start_from, stop_at):
                     continue
                 yield commit
-        skip_n = storage.objects_count
+                skip_n += 1
 
         for i, commit in enumerate(query.repo_iterate_commits()):
-            if i < skip_n or until < i or i < start_from: continue
+            if i < skip_n or not self._in_bounds(i, start_from, stop_at): continue
 
             cobj = self._create_commit(commit)
 
