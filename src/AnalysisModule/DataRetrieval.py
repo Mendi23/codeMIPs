@@ -23,6 +23,7 @@ def retreive_data(repo):
 
     for commit in repo:
         session = csr.commit_to_session(commit)
+        if not session.actions: continue
         data['user'].append(session.user.split('@', 1)[0])
         data['added'].append(session.get_session_objects(ChangeEnum.ADDED))
         data['modified'].append(session.get_session_objects(ChangeEnum.MODIFIED))

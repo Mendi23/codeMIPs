@@ -21,15 +21,18 @@ def draw_users(users_table, users_data, repo_name, result_folder):
         if u_table.empty: continue
         plt.figure(clear=True)
 
-        ax = u_table.plot(
-            kind='line', y='accuracy',
+        u_table = u_table.set_index("commits")
+        ax = u_table.plot.line(
             figsize=(10, 6),
             title=f"Accuracy per commits | repo: {repo_name} | user: {user}",
         )
-        ylabel = "MIP accuracy (doi/total_doi)"
         xlabel = "Commit number (linear)"
         ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
+        commits_label = "MIP accuracy (doi/total_doi)"
+        top3_label = "top_3 / total"
+        top5_label = "top_5 / total"
+        # ax.set_ylabel(ylabel)
+        ax.legend([commits_label, top3_label, top5_label])
 
         filename = path.join(result_folder, f"{user}.png")
         plt.savefig(filename)
@@ -47,8 +50,9 @@ def print_results(repo, visualize=False):
                      'top 3', 'top 5'])
 
     total, total_3, total_5 = 0, 0, 0
-    for j, commit in enumerate(X, 1):
+    for j, commit in enumerate(repo, 1):
         session = csr.commit_to_session(commit)
+        if not session.actions: continue
         objects = session.get_session_objects(ChangeEnum.MODIFIED)
         username = session.user.split('@', 1)[0]
         if len(objects) > 0:
@@ -124,4 +128,4 @@ if __name__ == "__main__":
     X, _ = p.X, p.Y
 
     for r in p.X:
-        print_results(r)
+        print_results(r, True)

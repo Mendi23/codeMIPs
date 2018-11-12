@@ -11,7 +11,7 @@ RESULTS_DIR = path.join(_root, "Results")
 
 
 def get_repo_result_dir(repo, params=None):
-    result_folder = path.join(RESULTS_DIR, repo.split('/')[-1])
+    result_folder = path.join(RESULTS_DIR, repo.name.split('/')[-1])
     if not path.exists(result_folder):
         mkdir(result_folder)
 
