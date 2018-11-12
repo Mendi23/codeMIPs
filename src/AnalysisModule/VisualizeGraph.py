@@ -118,8 +118,8 @@ def print_results(repo, visualize=False):
         f.write(f"\nTotal of {total} objects were emitted\n"
                 f"predicted {total_3} in the top-3\n"
                 f"predicted {total_5} in the top-5\n")
-        f.write("\n\nSummary:\n")
-        f.write(summarize_users.get_string(title="Users summary"))
+        f.write("\n\nUsers Summary:\n")
+        f.write(summarize_users.get_string())
 
 
 
