@@ -6,27 +6,27 @@
 ###################################
 
 TheAlgorithms/C-Plus-Plus
-TheAlgorithms/C
-fragglet/c-algorithms
-lohmann/json
-stedolan/jq
+## TheAlgorithms/C
+## fragglet/c-algorithms
+# lohmann/json
+## stedolan/jq
 
 ## MED SIZE:
 # TOO MUCH FILES # Microsoft/DirectXShaderCompiler
-mozilla/DeepSpeech
-Alexpux/mingw-w64
-nodemcu/nodemcu-firmware
-Microsoft/ELL
-mozilla/rr
+# mozilla/DeepSpeech
+# Alexpux/mingw-w64
+# nodemcu/nodemcu-firmware
+# Microsoft/ELL
+# mozilla/rr
 
 ## BIG REPOSITORIES:
 # vim/vim
 # videolan/vlc
-# tensorflow/tensorflow
+## tensorflow/tensorflow
 # nginx/nginx
-# electron/electron
+electron/electron
 # bitcoin/bitcoin
-# google/protobuf
+## google/protobuf
 # mozilla/gecko-dev
 # torvalds/linux
 # kripken/emscripten

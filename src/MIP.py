@@ -171,6 +171,9 @@ class Mip:
 
         for n in to_remove:
             self.mip.remove_node(n)
+            obj = self.nodeIDsToObjectsIds[n]
+            del self.nodeIDsToObjectsIds[n]
+            del self.objects[obj]
 
     def _updateEdge(self, i1, i2, edge_type, increment=1.0):
         if self.mip.has_edge(i1, i2):

@@ -56,5 +56,5 @@ if __name__ == "__main__":
     p = Provider(1)
     X, _ = p.X, p.Y
     for repo in p.X:
-        with open(path.join(get_repo_result_dir(repo), 'data.txt'), 'w') as f:
+        with open(path.join(get_repo_result_dir(repo.name), 'data.txt'), 'w') as f:
             retreive_data(repo).to_string(f)
