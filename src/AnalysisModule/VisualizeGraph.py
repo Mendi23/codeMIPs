@@ -1,9 +1,8 @@
-from collections import deque, defaultdict, namedtuple
-from functools import partial
+from collections import deque, defaultdict
 
 from src.MIP import Mip
 from CSR import CsrFiles
-from Factory import Provider
+from DataModule.Factory import Provider
 from prettytable import PrettyTable as pt
 from DataModule.models import ChangeEnum
 from os import path

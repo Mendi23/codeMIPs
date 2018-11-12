@@ -2,7 +2,7 @@ from scipy.optimize import minimize, Bounds
 from src.MIP import Mip
 from numpy import array
 from CSR import CsrFiles, TooManyActionsError
-from Factory import Provider
+from DataModule.Factory import Provider
 from copy import deepcopy
 from prettytable import PrettyTable as pt
 from DataModule.models import ChangeEnum

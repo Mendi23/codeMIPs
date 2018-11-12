@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from CSR import CsrFiles, TooManyActionsError
 from DataModule.models import ChangeEnum
-from Factory import Provider
+from DataModule.Factory import Provider
 from pyutils.file_paths import get_repo_result_dir
 from src.MIP import Mip
 
