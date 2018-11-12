@@ -171,8 +171,11 @@ class Patch(Base):
 
     def serialize(self):
         d = super().serialize()
-        d["source_lines"] = _encode_string(json.dumps(self.source_lines))
-        d["target_lines"] = _encode_string(json.dumps(self.target_lines))
+        if Patch.SERIALIZE_CONTENT:
+            d["source_lines"] = _encode_string(json.dumps(self.source_lines))
+            d["target_lines"] = _encode_string(json.dumps(self.target_lines))
+        else:
+            d["source_lines"] = d["target_lines"] = _encode_string(json.dumps([]))
         return d
 
     def _hooks(self):
