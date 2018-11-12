@@ -6,6 +6,12 @@ This module has several different scripts for analyze the data
 
 ## optimization.py
 
+This script is responsible of the alpha, beta, gamma optimization.
+
+We run the MIP on each repository for the first 80% commits and then test our score for the rest 20% commits.
+
+Using `scipy.optimize` module we try to maximize the score we get for all the repositories.
+
 ## plotPerUser.py
 
 For each repo, running the MIP on each commit one by one.

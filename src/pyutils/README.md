@@ -2,8 +2,6 @@
 
 This module Has common utils for the CodeMips project
 
----
-
 ## file_paths.py
 
 For creating absolute path for files and directory across the project.
@@ -13,7 +11,6 @@ For Example:
  * The storage direcotry
  * ...
 
----
 
 ## hashing.py
 

@@ -3,7 +3,6 @@
 This module is responsible on the data download,
 parsing to known common objects, split to train and test and cache.
 
----
 
 ## DataQuery.py
 
@@ -55,7 +54,6 @@ Params:
  * **ratio** - the ratio: (# train commits) / (# total commits)
  * **k_commits** - k commits = number of **test** commits.
 
----
 
 ## models.py
 
@@ -100,7 +98,6 @@ MODIFIED = 1
 RENAMED = 2
 DELETED = 3
 
----
 
 ## utils.py
 
