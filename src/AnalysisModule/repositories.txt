@@ -5,7 +5,7 @@
 # urielha/log4stash
 ###################################
 
-TheAlgorithms/C-Plus-Plus
+## TheAlgorithms/C-Plus-Plus
 ## TheAlgorithms/C
 ## fragglet/c-algorithms
 # lohmann/json
@@ -19,14 +19,14 @@ TheAlgorithms/C-Plus-Plus
 # Microsoft/ELL
 # mozilla/rr
 
-## BIG REPOSITORIES:
+# BIG REPOSITORIES:
 # vim/vim
 # videolan/vlc
-## tensorflow/tensorflow
+# tensorflow/tensorflow
 # nginx/nginx
-electron/electron
+# electron/electron
 # bitcoin/bitcoin
-## google/protobuf
+# google/protobuf
 # mozilla/gecko-dev
 # torvalds/linux
 # kripken/emscripten

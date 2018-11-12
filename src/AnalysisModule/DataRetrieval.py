@@ -23,25 +23,25 @@ def retreive_data(repo):
 
     for commit in repo:
         session = csr.commit_to_session(commit)
-        if not session.actions: continue
-        data['user'].append(session.user.split('@', 1)[0])
-        data['added'].append(session.get_session_objects(ChangeEnum.ADDED))
-        data['modified'].append(session.get_session_objects(ChangeEnum.MODIFIED))
+        if session.actions:
+            data['user'].append(session.user.split('@', 1)[0])
+            data['added'].append(session.get_session_objects(ChangeEnum.ADDED))
+            data['modified'].append(session.get_session_objects(ChangeEnum.MODIFIED))
 
-        for field in DOI_Fields:
-            data[f"modified_{field}"].append(0)
-            data[f"all_{field}"].append(0)
+            for field in DOI_Fields:
+                data[f"modified_{field}"].append(0)
+                data[f"all_{field}"].append(0)
 
-        for node, obj in mip.nodeIDsToObjectsIds.items():
-            doi = mip.getDoiComponents(session.user, node)
+            for node, obj in mip.nodeIDsToObjectsIds.items():
+                doi = mip.getDoiComponents(session.user, node)
 
-            for index, field in enumerate(DOI_Fields):
-                data[f"all_{field}"][-1]+= doi[index]
+                for index, field in enumerate(DOI_Fields):
+                    data[f"all_{field}"][-1]+= doi[index]
 
-                if obj in data['modified'][-1]:
-                    data[f"modified_{field}"][-1] +=doi[index]
+                    if obj in data['modified'][-1]:
+                        data[f"modified_{field}"][-1] +=doi[index]
 
-        mip.updateMIP(session)
+            mip.updateMIP(session)
 
     data['user'].append('@total@')
     data['modified'].append(list())
