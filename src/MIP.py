@@ -354,7 +354,7 @@ class Mip:
 
         plt.legend()
         plt.title(str(self))
-        plt.suptitle(f"graph before commit {self.iteration}",
+        plt.suptitle(f"graph before commit {self.iteration+1}",
             fontsize=14, fontweight='bold')
 
         plt.savefig(file_path)

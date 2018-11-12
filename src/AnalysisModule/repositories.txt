@@ -5,19 +5,19 @@
 # urielha/log4stash
 ###################################
 
-# TheAlgorithms/C-Plus-Plus
-# TheAlgorithms/C
-# fragglet/c-algorithms
-# nlohmann/json
-# stedolan/jq
+TheAlgorithms/C-Plus-Plus
+TheAlgorithms/C
+fragglet/c-algorithms
+lohmann/json
+stedolan/jq
 
 ## MED SIZE:
 # TOO MUCH FILES # Microsoft/DirectXShaderCompiler
-# mozilla/DeepSpeech
-# Alexpux/mingw-w64
-# nodemcu/nodemcu-firmware
-# Microsoft/ELL
-# mozilla/rr
+mozilla/DeepSpeech
+Alexpux/mingw-w64
+nodemcu/nodemcu-firmware
+Microsoft/ELL
+mozilla/rr
 
 ## BIG REPOSITORIES:
 # vim/vim

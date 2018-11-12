@@ -53,7 +53,8 @@ def retreive_data(repo):
 
 
 if __name__ == "__main__":
-    repo = argv[1]
-    p = Provider(1, repo)
-    with open(path.join(get_repo_result_dir(repo), 'data.txt'), 'w') as f:
-        retreive_data(p.X[0]).to_string(f)
+    p = Provider(1)
+    X, _ = p.X, p.Y
+    for repo in p.X:
+        with open(path.join(get_repo_result_dir(repo), 'data.txt'), 'w') as f:
+            retreive_data(repo).to_string(f)
