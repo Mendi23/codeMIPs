@@ -5,7 +5,7 @@ from CSR import CsrFiles
 from DataModule.Factory import Provider
 from prettytable import PrettyTable as pt
 from DataModule.models import ChangeEnum
-from os import path
+from os import path, mkdir
 from pyutils.file_paths import get_repo_result_dir
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -96,11 +96,13 @@ def print_results(repo, visualize=False):
                          "top_5": top_5 / num_objects, })
 
             if visualize:
+                mip_graphs_folder = create_folder_if_needed(result_folder, "MIP graphs")
                 ranked = [a[0] for a in mip_ranking[:10]]
-                mip.drawMip(path.join(result_folder, str(j)), session.user,
+                mip.drawMip(path.join(mip_graphs_folder, str(j)), session.user,
                     objects, ranked, False)
 
-                draw_users(users_table, users_data, repo.name, result_folder)
+                user_graphs_folder = create_folder_if_needed(result_folder, "User graphs")
+                draw_users(users_table, users_data, repo.name, user_graphs_folder)
 
         mip.updateMIP(session)
 
@@ -121,6 +123,12 @@ def print_results(repo, visualize=False):
         f.write("\n\nUsers Summary:\n")
         f.write(summarize_users.get_string())
 
+
+def create_folder_if_needed(result_folder, subfolder):
+    mip_graphs_folder = path.join(result_folder, subfolder)
+    if not path.exists(mip_graphs_folder):
+        mkdir(mip_graphs_folder)
+    return mip_graphs_folder
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ In every folder there are sub-folders with name formatted like this:
 `0.2_0.6_0.2` those numbers represents respectively the `alpha`, `beta`, `gamma`
 that we used on the MIP in order to produce the results inside this sub-folder.
 
-## User graphs
+## User graphs (created by VisualizeGraph.py)
 
 User graphs are named by the user so if the graph is about bob
 the name of the file will be bob.png and the graph will look like this:
@@ -65,7 +65,7 @@ The actual value of top5 will be a number between 0 to 5 respectively.
 At the end, the value you see in the graph is the value of top3
 divided by 3 and the value of top5 divided by 5 (or the number of files in the project if it has less than 5)
 
-## MIP Graph
+## MIP Graph (created by VisualizeGraph.py)
 
 MIP graphs are numbered. Each graph represents a state in the repository.
 Actually the number of the graph is the number of commits made to the repo so far.
@@ -87,7 +87,7 @@ and indeed the user made change to file number 7.
 Furthermore, the repository has 4 files so far.
 
 
-## res.txt
+## res.txt (created by VisualizeGraph.py)
 
 In res.txt there is extra information about the model results.
 Each line represents a commit.
@@ -103,4 +103,8 @@ And at the and there is a summary for the whole table. <br />
 In addition, there is a summary for each user.
 
 
+## data.txt (created by DataRetrieval.py)
 
+Summarize for each commit in the repository.
+
+This is not depend on the alpha/beta/gamma so the file can be found right under the repository folder
