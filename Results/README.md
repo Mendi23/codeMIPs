@@ -27,7 +27,7 @@ The user shane is a colaborator in this repository and had in total around 11 co
 as can be seen as x-axis max value (the line is slightly overlapping 10).
 The commits are ordered and numbered from the first commit the user did to the last one.
 
-In this example graph we can see that on the 5th commit:
+In this example graph we can see that **on the 6th commit**:
 
  * our model accuracy is around 0.5.
  * the top_3 accuracy is around 0.5 as well.
