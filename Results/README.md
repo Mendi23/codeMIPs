@@ -69,10 +69,8 @@ At the end, the value you see in the graph is the value of top_3
 divided by `min(3, number of files that changed)`
 and the value of top5 divided by `min(5, number of files that changed)`
 
-So in our case that we have only 4 files, <br/>
-The number of files that changed is less than 5
-and top5_files will contains all the files in the repo.<br/>
-In conclusion => `top_5/total` will always be 1.
+So **in our case** that we have only 4 files, the number of files that changed is less than 5
+and top5_files will contains all the files in the repo. That's why `top_5/total` will always be 1 on heapdict.
 
 ## MIP Graph (created by VisualizeGraph.py)
 
