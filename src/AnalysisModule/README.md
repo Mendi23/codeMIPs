@@ -1,8 +1,19 @@
 # AnalysisModule
 
-This module has several different scripts for analyze the data
+This module has several different scripts for analyze the data.
 
 ## DataRetrieval.py
+
+Extracting the `data.txt` for each repo.
+
+In that file can be found a table with line for each commit in the repository
+and details about the commit such as:
+
+ * Which files (ids) got modified or added
+ * User name for this commit
+ * centrality score for modified/added files
+ * Proximity score for modified/added files
+ * changeExtent score for modified/added files
 
 ## optimization.py
 
@@ -12,19 +23,37 @@ We run the MIP on each repository for the first 80% commits and then test our sc
 
 Using `scipy.optimize` module we try to maximize the score we get for all the repositories.
 
-## plotPerUser.py
-
-For each repo, running the MIP on each commit one by one.
-
-Saving how much commits done per user and for each commits what was the accuracy of the model.
-
-At the end, saving a summarize plot.
 
 ## repositoriesData.py
 
 For each repo, prints how much commits it has.
 
 ## VisualizeGraph.py
+
+For each repo, running the MIP on each commit one by one.
+
+Saving several things on the way:
+
+* Per User:
+  * Commits (number of commits)
+  * Total objects the user changed (across all commits)
+  * Total score - *score of one commit is the sum of the DOI of the files user changed divided by total DOI of all files in repo in that moment*.
+    Total score is the sum of all that scores per user.
+  * Total Top3 and Top5: top3 or top5 are files that have the highest DOI (top 3 or top5) <br/>
+    We count how much of them the user did change in a commit and this is the top3 or top5 parameter. <br/>
+    At the end we sum all top3/top5 across all user commits.
+* Per Commit:
+  * Commit number
+  * The committer (user)
+  * top5/top3 hits as described (but not per user this time)
+  * Score
+
+We save summarize plot for each user and for each state of the MIP graph.
+
+In addition, we write a data.txt file.
+
+More on this results can be found under `Results` directory (in the README.md there)
+
 
 ---
 

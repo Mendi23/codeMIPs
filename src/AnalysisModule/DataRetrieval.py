@@ -23,9 +23,14 @@ def retreive_data(repo):
     for commit in repo:
         session = csr.commit_to_session(commit)
         if session.actions:
+            added_objects = session.get_session_objects(ChangeEnum.ADDED)
+            modified_objects = session.get_session_objects(ChangeEnum.MODIFIED)
+            if not added_objects and not modified_objects:
+                continue
+
             data['user'].append(session.user.split('@', 1)[0])
-            data['added'].append(session.get_session_objects(ChangeEnum.ADDED))
-            data['modified'].append(session.get_session_objects(ChangeEnum.MODIFIED))
+            data['added'].append(added_objects)
+            data['modified'].append(modified_objects)
 
             for field in DOI_Fields:
                 data[f"modified_{field}"].append(0)
@@ -56,5 +61,5 @@ if __name__ == "__main__":
     p = Provider(1)
     X, _ = p.X, p.Y
     for repo in p.X:
-        with open(path.join(get_repo_result_dir(repo.name), 'data.txt'), 'w') as f:
+        with open(path.join(get_repo_result_dir(repo), 'data.txt'), 'w') as f:
             retreive_data(repo).to_string(f)
