@@ -84,6 +84,7 @@ class Mip:
                     'last_visit': -1}
             self.mip.add_node(self.lastID, **attr)
             self.nodeIDsToUsersIds[self.lastID] = user_name
+            self.centrality = None
         return self.users[user_name]
 
     def _addObject(self, object_id):
@@ -102,6 +103,7 @@ class Mip:
                     }
             self.mip.add_node(self.lastID, **attr)
             self.nodeIDsToObjectsIds[self.lastID] = object_id
+            self.centrality = None
         return self.objects[object_id]
 
     def getObjectNode(self, ao_id):

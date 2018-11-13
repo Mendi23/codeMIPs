@@ -39,6 +39,7 @@ def draw_users(users_table, users_data, repo_name, result_folder):
 
 
 def print_results(repo, visualize=False):
+    print(f"now working on repo: {repo.name}")
     mip = Mip(repo)
     csr = CsrFiles()
     result_folder = get_repo_result_dir(repo, [mip.alpha, mip.beta, mip.gamma])
