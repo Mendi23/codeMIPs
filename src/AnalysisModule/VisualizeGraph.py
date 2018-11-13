@@ -92,8 +92,8 @@ def print_results(repo, visualize=False):
             users_table.append({"user": username,
                          "commits": users_data[username]["commits"],
                          "accuracy": prop_score,
-                         "top_3": top_3 / num_objects,
-                         "top_5": top_5 / num_objects, })
+                         "top_3": top_3 / min(num_objects, 3),
+                         "top_5": top_5 / min(num_objects, 5), })
 
             if visualize:
                 mip_graphs_folder = create_folder_if_needed(result_folder, "MIP graphs")

@@ -58,12 +58,21 @@ Let's declare:
 Now, what we are doing next is to check how much files out of top3_files/top5_files
 where actually got changed by this user in the specific commit.
 
-The actual value of top3 will be a number between 0 to 3 which represents
-the actual number of files that got changed out of the top3. <br />
-The actual value of top5 will be a number between 0 to 5 respectively.
+The actual value of top_3 will be a number between 0 to 3 which represents
+the actual number of files that got changed out of the top3_files. <br />
+The actual value of top_5 will be a number between 0 to 5 respectively.
 
-At the end, the value you see in the graph is the value of top3
-divided by 3 and the value of top5 divided by 5 (or the number of files in the project if it has less than 5)
+Before we got to the end, pay attention that if only one file has been changed
+the maximum value of top_3 or top_5 can be 1.
+
+At the end, the value you see in the graph is the value of top_3
+divided by `min(3, number of files that changed)`
+and the value of top5 divided by `min(5, number of files that changed)`
+
+So in our case that we have only 4 files, <br/>
+The number of files that changed is less than 5
+and top5_files will contains all the files in the repo.<br/>
+In conclusion => `top_5/total` will always be 1.
 
 ## MIP Graph (created by VisualizeGraph.py)
 
