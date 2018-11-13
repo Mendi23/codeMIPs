@@ -6,7 +6,7 @@ All our graphs and data we have produced during our research can be found here.
 
 Each folder here represent one repository that we processed.
 
-For example: `tensorflow` represents the results for the [tensorflow/tensorflow](/tensorflow/tensorflow/) repository
+For example: `tensorflow` represents the results for the [tensorflow/tensorflow](https://github.com/tensorflow/tensorflow/) repository
 
 In every folder there are sub-folders with name formatted like this:
 `0.2_0.6_0.2` those numbers represents respectively the `alpha`, `beta`, `gamma`
