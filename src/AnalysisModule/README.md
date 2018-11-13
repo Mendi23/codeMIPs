@@ -42,7 +42,7 @@ Saving several things on the way:
   * Total Top3 and Top5: `top3` or `top5` are the number of files that have the highest DOI (top 3 or top5). <br/>
     We count how much out of these files the user actually did change in a specific commit and this is the top3 or top5 value. <br/>
     At the end we sum all top3/top5 across all user commits. <br />
-    More explanation on score and top3/top5 can be found at [Results/README.md](../../Results/README.md#the-meaning-of-top3top5).
+    More explanation on score and top3/top5 can be found at [Results/README.md](https://github.com/Mendi23/codeMIPs/tree/master/Results#the-meaning-of-top3top5).
 * Per Commit:
   * Commit number
   * The committer (user)
@@ -54,7 +54,7 @@ Pay attention that the plot for user is only for users who did more than 10 comm
 
 In addition, we write a data.txt file.
 
-More details can be found under `Results` directory at the [Results/README.md](../../Results/README.md)
+More details can be found under `Results` directory at the [Results/README.md](https://github.com/Mendi23/codeMIPs/tree/master/Results)
 
 
 ---
