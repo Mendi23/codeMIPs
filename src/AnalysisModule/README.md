@@ -39,9 +39,10 @@ Saving several things on the way:
   * Total objects the user changed (across all commits)
   * Total score - *score of one commit is the sum of the DOI of the files user changed divided by total DOI of all files in repo in that moment*.
     Total score is the sum of all that scores per user.
-  * Total Top3 and Top5: top3 or top5 are files that have the highest DOI (top 3 or top5) <br/>
-    We count how much of them the user did change in a commit and this is the top3 or top5 parameter. <br/>
-    At the end we sum all top3/top5 across all user commits.
+  * Total Top3 and Top5: `top3` or `top5` are the number of files that have the highest DOI (top 3 or top5). <br/>
+    We count how much out of these files the user actually did change in a specific commit and this is the top3 or top5 value. <br/>
+    At the end we sum all top3/top5 across all user commits. <br />
+    More explanation on score and top3/top5 can be found at [Results/README.md](../Results/README.md).
 * Per Commit:
   * Commit number
   * The committer (user)
@@ -49,6 +50,7 @@ Saving several things on the way:
   * Score
 
 We save summarize plot for each user and for each state of the MIP graph.
+Pay attention that the plot for user is only for users who did more than 10 commits.
 
 In addition, we write a data.txt file.
 

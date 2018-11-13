@@ -6,7 +6,7 @@ All our graphs and data we have produced during our research can be found here.
 
 Each folder here represent one repository that we processed.
 
-For example: `tensorflow` represents the results for the [tensorflow/tensorflow](https://github.com/tensorflow/tensorflow/) repository
+For example: `tensorflow` represents the results for the [tensorflow/tensorflow](/tensorflow/tensorflow/) repository
 
 In every folder there are sub-folders with name formatted like this:
 `0.2_0.6_0.2` those numbers represents respectively the `alpha`, `beta`, `gamma`
@@ -17,29 +17,53 @@ that we used on the MIP in order to produce the results inside this sub-folder.
 User graphs are named by the user so if the graph is about bob
 the name of the file will be bob.png and the graph will look like this:
 
-![user graph here]()
+![user graph here](https://github.com/Mendi23/codeMIPs/raw/master/Results/heapdict/0.2_0.6_0.2/shane.png)
 
 **Explanation:**
 
-This example is taken from ----- repository with 0.2, 0.6, 0.2 as alpha, beta and gamma.
-The user ------ is a colaborator in this repository and had in total --X-- commits
-as can be seen as x-axis max value.
+This example is taken from heapdict repository with 0.2, 0.6, 0.2 as alpha, beta and gamma.
+
+The user shane is a colaborator in this repository and had in total around 11 commits
+as can be seen as x-axis max value (the line is slightly overlapping 10).
 The commits are ordered and numbered from the first commit the user did to the last one.
 
-In this example we can see that on the --Y-- commit our model accuracy was ---Z---.
+In this example graph we can see that on the 5th commit:
 
-The meaning of "model accuracy" is that: <br/>
+ * our model accuracy is around 0.5.
+ * the top_3 accuracy is around 0.5 as well.
+ * the top_5 accuracy is 1 which means 100%. **Pay attention** that this repository has hardly 4 python files so we will always get 100% on top_5.
+
+Note that the plot for user is only for users who did more than 10 commits.
+
+#### The meaning of "model accuracy" is:
 On each iteration the model gave us a grade (degree of interest - a.k.a. DOI) for each file in the project,
 so the file with the highest grade will be most likely edited by the user in the next commit. <br/>
 For clarity let's assume the repo has only two files and call them F1 and F2.
 And let's say F1 has DOI of 3 and F2 has DOI of 1.
 Total DOI is 4.
-The user modified only the file F1 so our accuracy will be: F1_DOI / total_DOI
+
+Let's say the user modified only the file F1 so our accuracy will be: F1_DOI / total_DOI
 That is - 3/4.
 
 And in general the accuracy will be: `(Sum of DOI of files the user actually modified) / (total DOI of all files)`
 
-//////// yadaddadadyadyad//////////
+#### The meaning of top3/top5:
+On each commit we asking the model (MIP) to give as all the files in the
+repository ranked by DOI (degree of interest) of the current user.
+
+Let's declare:
+ * top3_files - Means the 3 files that got the highest DOI score at a specific moment out of all the files in the repo.
+ * top5_files - Means the same but for the 5 highest scores.
+
+Now, what we are doing next is to check how much files out of top3_files/top5_files
+where actually got changed by this user in the specific commit.
+
+The actual value of top3 will be a number between 0 to 3 which represents
+the actual number of files that got changed out of the top3. <br />
+The actual value of top5 will be a number between 0 to 5 respectively.
+
+At the end, the value you see in the graph is the value of top3
+divided by 3 and the value of top5 divided by 5 (or the number of files in the project if it has less than 5)
 
 ## MIP Graph
 
@@ -75,7 +99,8 @@ The data which can be found:
 * The user name that made the change.
 * Which files (only ids) got changed.
 
-And at the and there is a summary for the whole table
+And at the and there is a summary for the whole table. <br />
+In addition, there is a summary for each user.
 
 
 
