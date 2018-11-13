@@ -318,7 +318,7 @@ class Mip:
         nodes.extend(self._addObject(x) for x in objects_focus2)
         subgraph = self.mip.subgraph(nodes)
 
-        plt.figure(clear=True, frameon=False)
+        fig = plt.figure(clear=True, frameon=False)
         plt.axis('off')
         layout = nx.shell_layout(subgraph)  # pick graph layout
 
@@ -363,7 +363,7 @@ class Mip:
             fontsize=14, fontweight='bold')
 
         plt.savefig(file_path)
-        plt.close()
+        plt.close(fig)
 
     def __str__(self):
         return f"MIP_{self.name}__alpha={self.alpha}_beta={self.beta}_gamma={self.gamma}"

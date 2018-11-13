@@ -18,7 +18,7 @@ def draw_users(users_table, users_data, repo_name, result_folder):
     for user in (u for u, v in users_data.items() if v["commits"] > TOLERANCE):
         u_table = table[table["user"] == user]
         if u_table.empty: continue
-        plt.figure(clear=True)
+        fig = plt.figure(clear=True)
 
         u_table = u_table.set_index("commits")
         ax = u_table.plot.line(
@@ -35,7 +35,7 @@ def draw_users(users_table, users_data, repo_name, result_folder):
 
         filename = path.join(result_folder, f"{user}.png")
         plt.savefig(filename)
-        plt.close()
+        plt.close(fig)
 
 
 def print_results(repo, visualize=False):
