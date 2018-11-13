@@ -17,7 +17,7 @@ that we used on the MIP in order to produce the results inside this sub-folder.
 User graphs are named by the user so if the graph is about bob
 the name of the file will be bob.png and the graph will look like this:
 
-![user graph here](https://github.com/Mendi23/codeMIPs/raw/master/Results/heapdict/0.2_0.6_0.2/shane.png)
+![user graph here](https://github.com/Mendi23/codeMIPs/raw/master/Results/heapdict/0.2_0.6_0.2/User%20graphs/shane.png)
 
 **Explanation:**
 
@@ -72,7 +72,7 @@ Actually the number of the graph is the number of commits made to the repo so fa
 
 MIP graph will look like this:
 
-![mip graph here](https://github.com/Mendi23/codeMIPs/raw/master/Results/heapdict/0.2_0.6_0.2/4.png)
+![mip graph here](https://github.com/Mendi23/codeMIPs/raw/master/Results/heapdict/0.2_0.6_0.2/MIP%20graphs/4.png)
 
 **Explanation:**
 
