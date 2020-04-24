@@ -20,6 +20,6 @@ six==1.11.0
 smmap2==2.0.5
 sortedcollections==0.5.3
 sortedcontainers==1.5.7
-unidiff==0.5.5
-uritemplate==3.0.0
-urllib3==1.24
+unidiff
+uritemplate
+urllib3
